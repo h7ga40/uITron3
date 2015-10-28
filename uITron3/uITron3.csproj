@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{79BADCDC-8DDB-4CCD-8151-BB3889090706}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>uITron3</RootNamespace>
+    <AssemblyName>uITron3</AssemblyName>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;NO_SYS;CHECKSUM_CHECK_TCP;CHECKSUM_CHECK_UDP;CHECKSUM_GEN_TCP;CHECKSUM_GEN_UDP;IP_SOF_BROADCAST;IP_SOF_BROADCAST_RECV;LWIP_CALLBACK_API;LWIP_CHECKSUM_ON_COPY;LWIP_DEBUG;LWIP_NETIF_HWADDRHINT;LWIP_NETIF_TX_SINGLE_PBUF;LWIP_RAND;LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS;LWIP_TCP;LWIP_TCP_KEEPALIVE;LWIP_TCP_TIMESTAMPS;LWIP_UDP;LWIP_UDPLITE;LWIP_UDP_TODO;LWIP_STATS;PBUF_POOL_FREE_OOSEQ;PBUF_POOL_FREE_OOSEQ_QUEUE_CALL;SO_REUSE;SO_REUSE_RXTOALL;TCP_CALCULATE_EFF_SEND_MSS;TCP_CHECKSUM_ON_COPY;TCP_CHECKSUM_ON_COPY_SANITY_CHECK;TCP_CWND_DEBUG;TCP_DEBUG;TCP_DEBUG_PCB_LISTS;TCP_INPUT_DEBUG;TCP_LISTEN_BACKLOG;TCP_OOSEQ_MAX_BYTES;TCP_OOSEQ_MAX_PBUFS;TCP_OUTPUT_DEBUG;TCP_OVERSIZE;TCP_OVERSIZE_DBGCHECK;TCP_QUEUE_OOSEQ;TCP_WND_DEBUG;UDP_DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE;NO_SYS;CHECKSUM_CHECK_TCP;CHECKSUM_CHECK_UDP;CHECKSUM_GEN_TCP;CHECKSUM_GEN_UDP;IP_SOF_BROADCAST;IP_SOF_BROADCAST_RECV;LWIP_CALLBACK_API;LWIP_CHECKSUM_ON_COPY;LWIP_DEBUG;LWIP_NETIF_HWADDRHINT;LWIP_NETIF_TX_SINGLE_PBUF;LWIP_RAND;LWIP_RANDOMIZE_INITIAL_LOCAL_PORTS;LWIP_TCP;LWIP_TCP_KEEPALIVE;LWIP_TCP_TIMESTAMPS;LWIP_UDP;LWIP_UDPLITE;LWIP_UDP_TODO;LWIP_STATS;PBUF_POOL_FREE_OOSEQ;PBUF_POOL_FREE_OOSEQ_QUEUE_CALL;SO_REUSE;SO_REUSE_RXTOALL;TCP_CALCULATE_EFF_SEND_MSS;TCP_CHECKSUM_ON_COPY;TCP_CHECKSUM_ON_COPY_SANITY_CHECK;TCP_CWND_DEBUG;TCP_DEBUG;TCP_DEBUG_PCB_LISTS;TCP_INPUT_DEBUG;TCP_LISTEN_BACKLOG;TCP_OOSEQ_MAX_BYTES;TCP_OOSEQ_MAX_PBUFS;TCP_OUTPUT_DEBUG;TCP_OVERSIZE;TCP_OVERSIZE_DBGCHECK;TCP_QUEUE_OOSEQ;TCP_WND_DEBUG;UDP_DEBUG</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="CPUContext.cs" />
+    <Compile Include="CrtMemBlockHeader.cs" />
+    <Compile Include="CyclicHandler.cs" />
+    <Compile Include="EventFlag.cs" />
+    <Compile Include="ICPUContext.cs" />
+    <Compile Include="IStateMachine.cs" />
+    <Compile Include="Itron.cs" />
+    <Compile Include="Kernel.cs" />
+    <Compile Include="lwIP\debug.cs" />
+    <Compile Include="lwIP\def.cs" />
+    <Compile Include="lwIP\err.cs" />
+    <Compile Include="lwIP\inet_chksum.cs" />
+    <Compile Include="lwIP\ip.cs" />
+    <Compile Include="lwIP\ip_addr.cs" />
+    <Compile Include="lwIP\mem.cs" />
+    <Compile Include="lwIP\memp.cs" />
+    <Compile Include="lwIP\netif.cs" />
+    <Compile Include="lwIP\opt.cs" />
+    <Compile Include="lwIP\pbuf.cs" />
+    <Compile Include="lwIP\stats.cs" />
+    <Compile Include="lwIP\sys.cs" />
+    <Compile Include="lwIP\tcp.cs" />
+    <Compile Include="lwIP\tcp_impl.cs" />
+    <Compile Include="lwIP\tcp_in.cs" />
+    <Compile Include="lwIP\tcp_out.cs" />
+    <Compile Include="lwIP\udp.cs" />
+    <Compile Include="Mailbox.cs" />
+    <Compile Include="MemoryPool.cs" />
+    <Compile Include="MemoryPoolFixedsize.cs" />
+    <Compile Include="Nucleus.cs" />
+    <Compile Include="PacketBridge.cs" />
+    <Compile Include="Pointer.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Semaphore.cs" />
+    <Compile Include="SIFLayer.cs" />
+    <Compile Include="StateMachine.cs" />
+    <Compile Include="Task.cs" />
+    <Compile Include="TcpCep.cs" />
+    <Compile Include="TMemNode.cs" />
+    <Compile Include="TMemNodeList.cs" />
+    <Compile Include="UdpCep.cs" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
