@@ -764,7 +764,7 @@ namespace uITron3
 			   We do not dump tcp_state.TIME_WAIT pcb's; they can still be matched by incoming
 			   packets using both local and remote IP addresses and ports to distinguish.
 			 */
-			if (ip.ip_get_option(pcb, sof.SOF_REUSEADDR))
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
 			{
 				max_pcb_list = NUM_TCP_PCB_LISTS_NO_TIME_WAIT;
 			}
@@ -790,8 +790,8 @@ namespace uITron3
 						/* Omit checking for the same port if both pcbs have REUSEADDR set.
 						   For SO_REUSEADDR, the duplicate-check for a 5-tuple is done in
 						   tcp_connect. */
-						if (!ip.ip_get_option(pcb, sof.SOF_REUSEADDR) ||
-							!ip.ip_get_option(cpcb, sof.SOF_REUSEADDR))
+						if (!lwip.ip_get_option(pcb, sof.SOF_REUSEADDR) ||
+							!lwip.ip_get_option(cpcb, sof.SOF_REUSEADDR))
 #endif // SO_REUSE
 						{
 							if (ip_addr.ip_addr_isany(cpcb.local_ip) ||
@@ -855,7 +855,7 @@ namespace uITron3
 				return (tcp_pcb_listen)pcb;
 			}
 #if SO_REUSE
-			if (ip.ip_get_option(pcb, sof.SOF_REUSEADDR))
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
 			{
 				/* Since sof.SOF_REUSEADDR allows reusing a local address before the pcb's usage
 				   is declared (listen-/connection-pcb), we have to make sure now that
@@ -883,7 +883,7 @@ namespace uITron3
 			lpcb.state = tcp_state.LISTEN;
 			lpcb.prio = pcb.prio;
 			lpcb.so_options = pcb.so_options;
-			ip.ip_set_option(lpcb, (byte)sof.SOF_ACCEPTCONN);
+			lwip.ip_set_option(lpcb, (byte)sof.SOF_ACCEPTCONN);
 			lpcb.ttl = pcb.ttl;
 			lpcb.tos = pcb.tos;
 			ip_addr.ip_addr_copy(lpcb.local_ip, pcb.local_ip);
@@ -1050,7 +1050,7 @@ namespace uITron3
 			if (ip_addr.ip_addr_isany(pcb.local_ip))
 			{
 				/* Use the netif's IP address as local address. */
-				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip.ip_addr);
+				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip_addr);
 			}
 
 			old_local_port = pcb.local_port;
@@ -1063,7 +1063,7 @@ namespace uITron3
 				}
 			}
 #if SO_REUSE
-			if (ip.ip_get_option(pcb, sof.SOF_REUSEADDR))
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
 			{
 				/* Since sof.SOF_REUSEADDR allows reusing a local address, we have to make sure
 				   now that the 5-tuple is unique. */
@@ -1260,7 +1260,7 @@ namespace uITron3
 				}
 
 				/* Check if KEEPALIVE should be sent */
-				if (ip.ip_get_option(pcb, (byte)sof.SOF_KEEPALIVE) &&
+				if (lwip.ip_get_option(pcb, (byte)sof.SOF_KEEPALIVE) &&
 				   ((pcb.state == tcp_state.ESTABLISHED) ||
 					(pcb.state == tcp_state.CLOSE_WAIT)))
 				{
@@ -2000,7 +2000,7 @@ namespace uITron3
 		{
 			ushort mss_s;
 
-			mss_s = (ushort)(lwip.ip.mtu - ip.IP_HLEN - tcp.TCP_HLEN);
+			mss_s = (ushort)(lwip.mtu - lwip.IP_HLEN - tcp.TCP_HLEN);
 			/* RFC 1122, chap 4.2.2.6:
 			 * Eff.snd.MSS = min(SendMSS+20, MMS_S) - TCPhdrsize - IPoptionsize
 			 * We correct for TCP options in tcp_write(), and don't support IP options.

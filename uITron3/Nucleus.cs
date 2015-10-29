@@ -52,7 +52,7 @@ namespace uITron3
 
 			m_SysTime.Value = 0;
 			m_CurrentTask = null;
-			m_lwIP = new lwip();
+			m_lwIP = new lwip(ip_output);
 		}
 
 		public int SysTmrIntNo { get { return m_SysTmrIntNo; } }
@@ -73,10 +73,6 @@ namespace uITron3
 
 		public void Start()
 		{
-			ip_addr ipaddr = new ip_addr(0xC0B60102);
-			ip_addr netmask = new ip_addr(0xFFFFFF00);
-			ip_addr gw = new ip_addr(0xC0B60101);
-
 #if LWIP_STATS
 			stats.stats_init();
 #endif
@@ -86,13 +82,11 @@ namespace uITron3
 			lwip.memp_init();
 			pbuf.pbuf_init(m_lwIP);
 
-			ip.ip_init(m_lwIP, ip_output);
-
 			udp.udp_init(m_lwIP);
 			tcp.tcp_init(m_lwIP);
 		}
 
-		private void ip_output(ip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
+		private void ip_output(lwip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
 		{
 			throw new NotImplementedException();
 		}

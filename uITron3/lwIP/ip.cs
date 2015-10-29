@@ -116,9 +116,9 @@ namespace uITron3
 		public ip_addr src = new ip_addr(new byte[ip_addr.length]);
 	}
 
-	public delegate void netif_output_t(ip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto);
+	public delegate void netif_output_t(lwip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto);
 
-	public partial class ip
+	public partial class lwip
 	{
 		internal const int IP_HLEN = ip_hdr.length;
 		public const int IP_PROTO_ICMP = 1;
@@ -128,22 +128,15 @@ namespace uITron3
 		public const int IP_PROTO_TCP = 6;
 		public const byte NETIF_FLAG_BROADCAST = (byte)0x02U;
 
-		private lwip lwip;
 		public ushort mtu = 1500;
 		public ip_addr ip_addr = new ip_addr(0x00000000);
 		public ip_addr netmask = new ip_addr(0xFFFFFFFF);
 		public byte flags = NETIF_FLAG_BROADCAST;
 		private netif_output_t m_output;
 
-		public ip(lwip lwip, netif_output_t output)
+		public lwip(netif_output_t output)
 		{
-			this.lwip = lwip;
 			m_output = output;
-		}
-
-		internal static void ip_init(lwip lwip, netif_output_t output)
-		{
-			lwip.ip = new ip(lwip, output);
 		}
 
 		internal static bool ip_get_option(ip_pcb pcb, byte flag)
@@ -193,7 +186,7 @@ namespace uITron3
 			   gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
-			return ip_output_if(p, src, dest, ttl, tos, proto, this);
+			return ip_output_if(p, src, dest, ttl, tos, proto);
 		}
 
 #if LWIP_NETIF_HWADDRHINT
@@ -224,35 +217,35 @@ namespace uITron3
 			   gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
-			err = ip_output_if(p, src, dest, ttl, tos, proto, this);
+			err = ip_output_if(p, src, dest, ttl, tos, proto);
 
 			return err;
 		}
 #endif // LWIP_NETIF_HWADDRHINT
 
-		internal err_t ip_output_if(pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto, ip netif)
+		internal err_t ip_output_if(pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto)
 		{
 			/* pbufs passed to IP must have a @ref-count of 1 as their payload pointer
 			 gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
 			/* generate IP header */
-			if (lwip.pbuf_header(p, ip.IP_HLEN) != 0) {
-				lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "ip.ip_output: not enough room for IP header in pbuf\n");
+			if (lwip.pbuf_header(p, lwip.IP_HLEN) != 0) {
+				lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "lwip.ip_output: not enough room for IP header in pbuf\n");
 
-				++lwip.lwip_stats.ip.err;
+				++lwip_stats.ip.err;
 				//snmp.snmp_inc_ipoutdiscards();
 				return err_t.ERR_BUF;
 			}
 
-			++lwip.lwip_stats.ip.xmit;
+			++lwip_stats.ip.xmit;
 
-			return ip.output(netif, p, src, dest, ttl, tos, proto);
+			return output(this, p, src, dest, ttl, tos, proto);
 		}
 
 		internal err_t ip_input(pbuf p, ip_addr src, ip_addr dest, byte proto)
 		{
-			++lwip.lwip_stats.ip.recv;
+			++lwip_stats.ip.recv;
 
 			/* copy IP addresses to aligned ip_addr */
 			ip_addr.ip_addr_copy(current_iphdr_dest, dest);
@@ -269,8 +262,8 @@ namespace uITron3
 					/* packet source is not valid */
 					lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_TRACE | lwip.LWIP_DBG_LEVEL_WARNING, "ip_input: packet source is not valid.\n");
 					/* free (drop) packet pbufs */
-					lwip.pbuf_free(p);
-					++lwip.lwip_stats.ip.drop;
+					pbuf_free(p);
+					++lwip_stats.ip.drop;
 					//snmp.snmp_inc_ipinaddrerrors();
 					//snmp.snmp_inc_ipindiscards();
 					return err_t.ERR_OK;
@@ -284,7 +277,7 @@ namespace uITron3
 #endif
 			lwip.LWIP_DEBUGF(opt.IP_DEBUG, "ip_input: p.len {0} p.tot_len {1}\n", p.len, p.tot_len);
 
-			//ip.current_header = iphdr;
+			//lwip.current_header = iphdr;
 
 #if LWIP_RAW
 			/* raw input did not eat the packet? */
@@ -293,65 +286,65 @@ namespace uITron3
 			{
 				switch (proto) {
 #if LWIP_UDP
-				case ip.IP_PROTO_UDP:
+				case lwip.IP_PROTO_UDP:
 #if LWIP_UDPLITE
-				case ip.IP_PROTO_UDPLITE:
+				case lwip.IP_PROTO_UDPLITE:
 #endif // LWIP_UDPLITE
 					//snmp.snmp_inc_ipindelivers();
-					lwip.udp.udp_input(p, this);
+					udp.udp_input(p, this);
 					break;
 #endif // LWIP_UDP
 #if LWIP_TCP
-				case ip.IP_PROTO_TCP:
+				case lwip.IP_PROTO_TCP:
 					//snmp.snmp_inc_ipindelivers();
-					lwip.tcp.tcp_input(p, this);
+					tcp.tcp_input(p, this);
 					break;
 #endif // LWIP_TCP
 #if LWIP_ICMP
-				case ip.IP_PROTO_ICMP:
+				case lwip.IP_PROTO_ICMP:
 					//snmp.snmp_inc_ipindelivers();
 					lwip.icmp.icmp_input(p, inp);
 					break;
 #endif // LWIP_ICMP
 #if LWIP_IGMP
-				case ip.IP_PROTO_IGMP:
-					lwip.igmp.igmp_input(p, inp, ip.current_iphdr_dest);
+				case lwip.IP_PROTO_IGMP:
+					lwip.igmp.igmp_input(p, inp, lwip.current_iphdr_dest);
 					break;
 #endif // LWIP_IGMP
 				default:
 #if LWIP_ICMP
 					/* send ICMP destination protocol unreachable unless is was a broadcast */
-					if (!ip_addr.ip_addr_isbroadcast(ip.current_iphdr_dest, inp) &&
-						!ip_addr.ip_addr_ismulticast(ip.current_iphdr_dest))
+					if (!ip_addr.ip_addr_isbroadcast(lwip.current_iphdr_dest, inp) &&
+						!ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest))
 					{
 						p.payload = iphdr;
 						lwip.icmp.icmp_dest_unreach(p, icmp_dur_type.ICMP_DUR_PROTO);
 					}
 #endif // LWIP_ICMP
-					lwip.pbuf_free(p);
+					pbuf_free(p);
 
-					lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "Unsupported transport protocol {0}\n", proto);
+					LWIP_DEBUGF(opt.IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS, "Unsupported transport protocol {0}\n", proto);
 
-					++lwip.lwip_stats.ip.proterr;
-					++lwip.lwip_stats.ip.drop;
+					++lwip_stats.ip.proterr;
+					++lwip_stats.ip.drop;
 					//snmp.snmp_inc_ipinunknownprotos();
 					break;
 				}
 			}
 
-			//ip.current_header = null;
+			//lwip.current_header = null;
 			ip_addr.ip_addr_set_any(current_iphdr_src);
 			ip_addr.ip_addr_set_any(current_iphdr_dest);
 
 			return err_t.ERR_OK;
 		}
 
-		internal static err_t output(ip ip, pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto)
+		internal err_t output(lwip ip, pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto)
 		{
 			int pos = 0, rest = p.tot_len;
 			byte[] packet = new byte[rest];
-			ip_addr srch = new ip_addr(lwip.lwip_ntohl(src.addr));
-			ip_addr desth = new ip_addr(lwip.lwip_ntohl(dest.addr));
+			ip_addr srch = new ip_addr(lwip_ntohl(src.addr));
+			ip_addr desth = new ip_addr(lwip_ntohl(dest.addr));
 
 			for (pbuf q = p; q != null; q = q.next) {
 				int len = rest;
@@ -363,7 +356,7 @@ namespace uITron3
 				rest -= len;
 			}
 
-			ip.m_output(ip, packet, srch, desth, proto);
+			m_output(ip, packet, srch, desth, proto);
 
 			return err_t.ERR_OK;
 		}
@@ -372,7 +365,7 @@ namespace uITron3
 		{
 			ip_addr src = new ip_addr(lwip.lwip_htonl(srcn.addr));
 			ip_addr dest = new ip_addr(lwip.lwip_htonl(destn.addr));
-			pbuf p = lwip.pbuf_alloc(pbuf_layer.PBUF_RAW, (ushort)packet.Length, pbuf_type.PBUF_POOL);
+			pbuf p = pbuf_alloc(pbuf_layer.PBUF_RAW, (ushort)packet.Length, pbuf_type.PBUF_POOL);
 			int pos = 0, rest = packet.Length;
 
 			for (pbuf q = p; q != null; q = q.next) {
@@ -385,13 +378,8 @@ namespace uITron3
 				rest -= len;
 			}
 
-			if (lwip.ip.ip_input(p, src, dest, proto) != err_t.ERR_OK)
-				lwip.pbuf_free(p);
+			if (ip_input(p, src, dest, proto) != err_t.ERR_OK)
+				pbuf_free(p);
 		}
-	}
-
-	partial class lwip
-	{
-		internal ip ip;
 	}
 }
