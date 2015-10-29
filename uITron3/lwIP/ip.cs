@@ -116,6 +116,8 @@ namespace uITron3
 		public ip_addr src = new ip_addr(new byte[ip_addr.length]);
 	}
 
+	public delegate void netif_output_t(ip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto);
+
 	public partial class ip
 	{
 		internal const int IP_HLEN = ip_hdr.length;
@@ -124,17 +126,24 @@ namespace uITron3
 		public const int IP_PROTO_UDP = 17;
 		public const int IP_PROTO_UDPLITE = 136;
 		public const int IP_PROTO_TCP = 6;
-		private lwip lwip;
-		public netif current_netif;
+		public const byte NETIF_FLAG_BROADCAST = (byte)0x02U;
 
-		public ip(lwip lwip)
+		private lwip lwip;
+		public ushort mtu = 1500;
+		public ip_addr ip_addr = new ip_addr(0x00000000);
+		public ip_addr netmask = new ip_addr(0xFFFFFFFF);
+		public byte flags = NETIF_FLAG_BROADCAST;
+		private netif_output_t m_output;
+
+		public ip(lwip lwip, netif_output_t output)
 		{
 			this.lwip = lwip;
+			m_output = output;
 		}
 
-		internal static void ip_init(lwip lwip)
+		internal static void ip_init(lwip lwip, netif_output_t output)
 		{
-			lwip.ip = new ip(lwip);
+			lwip.ip = new ip(lwip, output);
 		}
 
 		internal static bool ip_get_option(ip_pcb pcb, byte flag)
@@ -145,11 +154,6 @@ namespace uITron3
 		internal static void ip_set_option(ip_pcb pcb, byte flag)
 		{
 			pcb.so_options |= flag;
-		}
-
-		internal netif ip_route(ip_addr remote_ip)
-		{
-			return lwip.netif;
 		}
 
 		internal ip_addr current_iphdr_src = new ip_addr(new byte[ip_addr.length]);
@@ -185,21 +189,11 @@ namespace uITron3
 		public err_t ip_output(pbuf p, ip_addr src, ip_addr dest,
 			byte ttl, byte tos, byte proto)
 		{
-			netif netif;
-
 			/* pbufs passed to IP must have a @ref-count of 1 as their payload pointer
 			   gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
-			if ((netif = lwip.ip.ip_route(dest)) == null)
-			{
-				lwip.LWIP_DEBUGF(opt.IP_DEBUG, "ip.ip_output: No route to {0}.{1}.{2}.{3}\n",
-				  ip_addr.ip4_addr1_16(dest), ip_addr.ip4_addr2_16(dest), ip_addr.ip4_addr3_16(dest), ip_addr.ip4_addr4_16(dest));
-				++lwip.lwip_stats.ip.rterr;
-				return err_t.ERR_RTE;
-			}
-
-			return ip_output_if(p, src, dest, ttl, tos, proto, netif);
+			return ip_output_if(p, src, dest, ttl, tos, proto, this);
 		}
 
 #if LWIP_NETIF_HWADDRHINT
@@ -224,38 +218,26 @@ namespace uITron3
 		public err_t ip_output_hinted(pbuf p, ip_addr src, ip_addr dest,
 			byte ttl, byte tos, byte proto, object addr_hint)
 		{
-			netif netif;
 			err_t err;
 
 			/* pbufs passed to IP must have a @ref-count of 1 as their payload pointer
 			   gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
-			if ((netif = lwip.ip.ip_route(dest)) == null)
-			{
-				lwip.LWIP_DEBUGF(opt.IP_DEBUG, "ip.ip_output: No route to {0}.{1}.{2}.{3}\n",
-				  ip_addr.ip4_addr1_16(dest), ip_addr.ip4_addr2_16(dest), ip_addr.ip4_addr3_16(dest), ip_addr.ip4_addr4_16(dest));
-				++lwip.lwip_stats.ip.rterr;
-				return err_t.ERR_RTE;
-			}
-
-			netif.NETIF_SET_HWADDRHINT(netif, addr_hint);
-			err = ip_output_if(p, src, dest, ttl, tos, proto, netif);
-			netif.NETIF_SET_HWADDRHINT(netif, null);
+			err = ip_output_if(p, src, dest, ttl, tos, proto, this);
 
 			return err;
 		}
 #endif // LWIP_NETIF_HWADDRHINT
 
-		internal err_t ip_output_if(pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto, netif netif)
+		internal err_t ip_output_if(pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto, ip netif)
 		{
 			/* pbufs passed to IP must have a @ref-count of 1 as their payload pointer
 			 gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
 			/* generate IP header */
-			if (lwip.pbuf_header(p, ip.IP_HLEN) != 0)
-			{
+			if (lwip.pbuf_header(p, ip.IP_HLEN) != 0) {
 				lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "ip.ip_output: not enough room for IP header in pbuf\n");
 
 				++lwip.lwip_stats.ip.err;
@@ -265,10 +247,10 @@ namespace uITron3
 
 			++lwip.lwip_stats.ip.xmit;
 
-			return netif.output(netif, p, src, dest, ttl, tos, proto);
+			return ip.output(netif, p, src, dest, ttl, tos, proto);
 		}
 
-		internal err_t ip_input(pbuf p, ip_addr src, ip_addr dest, byte proto, netif inp)
+		internal err_t ip_input(pbuf p, ip_addr src, ip_addr dest, byte proto)
 		{
 			++lwip.lwip_stats.ip.recv;
 
@@ -282,9 +264,8 @@ namespace uITron3
 			if (check_ip_src != 0 && !ip_addr.ip_addr_isany(ip.current_iphdr_src))
 #endif // IP_ACCEPT_LINK_LAYER_ADDRESSING
 			{
-				if ((ip_addr.ip_addr_isbroadcast(current_iphdr_src, inp)) ||
-					(ip_addr.ip_addr_ismulticast(current_iphdr_src)))
-				{
+				if ((ip_addr.ip_addr_isbroadcast(current_iphdr_src, this)) ||
+					(ip_addr.ip_addr_ismulticast(current_iphdr_src))) {
 					/* packet source is not valid */
 					lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_TRACE | lwip.LWIP_DBG_LEVEL_WARNING, "ip_input: packet source is not valid.\n");
 					/* free (drop) packet pbufs */
@@ -303,7 +284,6 @@ namespace uITron3
 #endif
 			lwip.LWIP_DEBUGF(opt.IP_DEBUG, "ip_input: p.len {0} p.tot_len {1}\n", p.len, p.tot_len);
 
-			current_netif = inp;
 			//ip.current_header = iphdr;
 
 #if LWIP_RAW
@@ -311,21 +291,20 @@ namespace uITron3
 			if (raw.raw_input(p, inp) == 0)
 #endif // LWIP_RAW
 			{
-				switch (proto)
-				{
+				switch (proto) {
 #if LWIP_UDP
 				case ip.IP_PROTO_UDP:
 #if LWIP_UDPLITE
 				case ip.IP_PROTO_UDPLITE:
 #endif // LWIP_UDPLITE
 					//snmp.snmp_inc_ipindelivers();
-					lwip.udp.udp_input(p, inp);
+					lwip.udp.udp_input(p, this);
 					break;
 #endif // LWIP_UDP
 #if LWIP_TCP
 				case ip.IP_PROTO_TCP:
 					//snmp.snmp_inc_ipindelivers();
-					lwip.tcp.tcp_input(p, inp);
+					lwip.tcp.tcp_input(p, this);
 					break;
 #endif // LWIP_TCP
 #if LWIP_ICMP
@@ -360,12 +339,54 @@ namespace uITron3
 				}
 			}
 
-			current_netif = null;
 			//ip.current_header = null;
 			ip_addr.ip_addr_set_any(current_iphdr_src);
 			ip_addr.ip_addr_set_any(current_iphdr_dest);
 
 			return err_t.ERR_OK;
+		}
+
+		internal static err_t output(ip ip, pbuf p, ip_addr src, ip_addr dest, byte ttl, byte tos, byte proto)
+		{
+			int pos = 0, rest = p.tot_len;
+			byte[] packet = new byte[rest];
+			ip_addr srch = new ip_addr(lwip.lwip_ntohl(src.addr));
+			ip_addr desth = new ip_addr(lwip.lwip_ntohl(dest.addr));
+
+			for (pbuf q = p; q != null; q = q.next) {
+				int len = rest;
+				if (len > q.len)
+					len = q.len;
+
+				Buffer.BlockCopy(q.payload.data, q.payload.offset, packet, pos, len);
+				pos += len;
+				rest -= len;
+			}
+
+			ip.m_output(ip, packet, srch, desth, proto);
+
+			return err_t.ERR_OK;
+		}
+
+		internal void input(byte[] packet, ip_addr srcn, ip_addr destn, byte proto)
+		{
+			ip_addr src = new ip_addr(lwip.lwip_htonl(srcn.addr));
+			ip_addr dest = new ip_addr(lwip.lwip_htonl(destn.addr));
+			pbuf p = lwip.pbuf_alloc(pbuf_layer.PBUF_RAW, (ushort)packet.Length, pbuf_type.PBUF_POOL);
+			int pos = 0, rest = packet.Length;
+
+			for (pbuf q = p; q != null; q = q.next) {
+				int len = rest;
+				if (len > q.len)
+					len = q.len;
+
+				Buffer.BlockCopy(packet, pos, q.payload.data, q.payload.offset, len);
+				pos += len;
+				rest -= len;
+			}
+
+			if (lwip.ip.ip_input(p, src, dest, proto) != err_t.ERR_OK)
+				lwip.pbuf_free(p);
 		}
 	}
 

@@ -56,7 +56,6 @@
     <Compile Include="lwIP\ip_addr.cs" />
     <Compile Include="lwIP\mem.cs" />
     <Compile Include="lwIP\memp.cs" />
-    <Compile Include="lwIP\netif.cs" />
     <Compile Include="lwIP\opt.cs" />
     <Compile Include="lwIP\pbuf.cs" />
     <Compile Include="lwIP\stats.cs" />

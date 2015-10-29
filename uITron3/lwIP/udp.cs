@@ -257,7 +257,7 @@ namespace uITron3
 		 * @param inp network interface on which the datagram was received.
 		 *
 		 */
-		public void udp_input(pbuf p, netif inp)
+		public void udp_input(pbuf p, ip inp)
 		{
 			udp_hdr udphdr;
 			udp_pcb pcb, prev;
@@ -650,27 +650,9 @@ namespace uITron3
 			ushort dst_port, byte have_chksum, ushort chksum)
 		{
 #endif // LWIP_CHECKSUM_ON_COPY
-			netif netif;
-
 			lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE, "udp_send\n");
-
-			/* find the outgoing network interface for this packet */
-#if LWIP_IGMP
-			netif = lwip.ip.ip_route((ip_addr.ip_addr_ismulticast(dst_ip)) ? (pcb.multicast_ip) : (dst_ip));
-#else
-			netif = lwip.ip.ip_route(dst_ip);
-#endif // LWIP_IGMP
-
-			/* no outgoing network interface could be found? */
-			if (netif == null)
-			{
-				lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "udp_send: No route to {0}.{1}.{2}.{3}\n",
-				  ip_addr.ip4_addr1_16(dst_ip), ip_addr.ip4_addr2_16(dst_ip), ip_addr.ip4_addr3_16(dst_ip), ip_addr.ip4_addr4_16(dst_ip));
-				++lwip.lwip_stats.udp.rterr;
-				return err_t.ERR_RTE;
-			}
 #if LWIP_CHECKSUM_ON_COPY
-			return udp_sendto_if_chksum(pcb, p, dst_ip, dst_port, netif, have_chksum, chksum);
+			return udp_sendto_if_chksum(pcb, p, dst_ip, dst_port, lwip.ip, have_chksum, chksum);
 #else // LWIP_CHECKSUM_ON_COPY
 			return udp_sendto_if(pcb, p, dst_ip, dst_port, netif);
 #endif // LWIP_CHECKSUM_ON_COPY
@@ -695,7 +677,7 @@ namespace uITron3
 		 *
 		 * @see udp_disconnect() udp_send()
 		 */
-		public err_t udp_sendto_if(udp_pcb pcb, pbuf p, ip_addr dst_ip, ushort dst_port, netif netif)
+		public err_t udp_sendto_if(udp_pcb pcb, pbuf p, ip_addr dst_ip, ushort dst_port, ip netif)
 		{
 #if LWIP_CHECKSUM_ON_COPY
 			return udp_sendto_if_chksum(pcb, p, dst_ip, dst_port, netif, 0, 0);
@@ -703,7 +685,7 @@ namespace uITron3
 
 		/** Same as udp_sendto_if(), but with checksum */
 		public err_t udp_sendto_if_chksum(udp_pcb pcb, pbuf p, ip_addr dst_ip,
-			ushort dst_port, netif netif, byte have_chksum, ushort chksum)
+			ushort dst_port, ip netif, byte have_chksum, ushort chksum)
 		{
 #endif // LWIP_CHECKSUM_ON_COPY
 			udp_hdr udphdr;
@@ -854,9 +836,7 @@ namespace uITron3
 #endif // CHECKSUM_GEN_UDP
 				/* output to IP */
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_send: ip_output_if (,,,,ip.IP_PROTO_UDPLITE,)\n");
-				netif.NETIF_SET_HWADDRHINT(netif, pcb.addr_hint);
 				err = lwip.ip.ip_output_if(q, src_ip, dst_ip, pcb.ttl, pcb.tos, ip.IP_PROTO_UDPLITE, netif);
-				netif.NETIF_SET_HWADDRHINT(netif, null);
 			}
 			else
 #endif // LWIP_UDPLITE
@@ -894,11 +874,7 @@ namespace uITron3
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_send: UDP checksum 0x{0:X}\n", udphdr.chksum);
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_send: ip_output_if (,,,,ip.IP_PROTO_UDP,)\n");
 				/* output to IP */
-#if LWIP_NETIF_HWADDRHINT
-				netif.NETIF_SET_HWADDRHINT(netif, pcb.addr_hint);
-#endif
 				err = lwip.ip.ip_output_if(q, src_ip, dst_ip, pcb.ttl, pcb.tos, ip.IP_PROTO_UDP, netif);
-				netif.NETIF_SET_HWADDRHINT(netif, null);
 			}
 			/* TODO: must this be increased even if error occured? */
 			//snmp.snmp_inc_udpoutdatagrams();
@@ -1051,18 +1027,10 @@ namespace uITron3
 			/* Nail down local IP for netconn_addr()/getsockname() */
 			if (ip_addr.ip_addr_isany(pcb.local_ip) && !ip_addr.ip_addr_isany(pcb.remote_ip))
 			{
-				netif netif;
-
-				if ((netif = lwip.ip.ip_route(pcb.remote_ip)) == null)
-				{
-					lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_connect: No route to 0x{0:x}\n", pcb.remote_ip.addr);
-					++lwip.lwip_stats.udp.rterr;
-					return err_t.ERR_RTE;
-				}
 				/** TODO: this will bind the udp pcb locally, to the interface which
 					is used to route output packets to the remote address. However, we
 					might want to accept incoming packets on any interface! */
-				ip_addr.ip_addr_copy(pcb.local_ip, netif.ip_addr);
+				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip.ip_addr);
 			}
 			else if (ip_addr.ip_addr_isany(pcb.remote_ip))
 			{

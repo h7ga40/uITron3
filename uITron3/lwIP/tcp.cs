@@ -1049,16 +1049,8 @@ namespace uITron3
 			/* check if we have a route to the remote host */
 			if (ip_addr.ip_addr_isany(pcb.local_ip))
 			{
-				/* no local IP address set, yet. */
-				netif netif = lwip.ip.ip_route(pcb.remote_ip);
-				if (netif == null)
-				{
-					/* Don't even try to send a SYN packet if we have no route
-					   since that will fail. */
-					return err_t.ERR_RTE;
-				}
 				/* Use the netif's IP address as local address. */
-				ip_addr.ip_addr_copy(pcb.local_ip, netif.ip_addr);
+				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip.ip_addr);
 			}
 
 			old_local_port = pcb.local_port;
@@ -2007,18 +1999,14 @@ namespace uITron3
 		public ushort tcp_eff_send_mss(ushort sendmss, ip_addr addr)
 		{
 			ushort mss_s;
-			netif outif;
 
-			outif = lwip.ip.ip_route(addr);
-			if ((outif != null) && (outif.mtu != 0))
-			{
-				mss_s = (ushort)(outif.mtu - ip.IP_HLEN - tcp.TCP_HLEN);
-				/* RFC 1122, chap 4.2.2.6:
-				 * Eff.snd.MSS = min(SendMSS+20, MMS_S) - TCPhdrsize - IPoptionsize
-				 * We correct for TCP options in tcp_write(), and don't support IP options.
-				 */
-				sendmss = Math.Min(sendmss, mss_s);
-			}
+			mss_s = (ushort)(lwip.ip.mtu - ip.IP_HLEN - tcp.TCP_HLEN);
+			/* RFC 1122, chap 4.2.2.6:
+			 * Eff.snd.MSS = min(SendMSS+20, MMS_S) - TCPhdrsize - IPoptionsize
+			 * We correct for TCP options in tcp_write(), and don't support IP options.
+			 */
+			sendmss = Math.Min(sendmss, mss_s);
+
 			return sendmss;
 		}
 #endif // TCP_CALCULATE_EFF_SEND_MSS

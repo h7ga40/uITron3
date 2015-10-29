@@ -77,7 +77,7 @@ namespace uITron3
 		 * @param p received TCP segment to process (p.payload pointing to the IP header)
 		 * @param inp network interface on which this segment was received
 		 */
-		public void tcp_input(pbuf p, netif inp)
+		public void tcp_input(pbuf p, ip inp)
 		{
 			tcp_pcb pcb, prev;
 			tcp_pcb_listen lpcb;

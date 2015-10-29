@@ -187,7 +187,7 @@ namespace uITron3
 
 		public static bool ip_addr_isany(ip_addr addr1) { return ((addr1) == null || (addr1).addr == IPADDR_ANY); }
 
-		public static bool ip_addr_isbroadcast(ip_addr ipaddr, netif netif) { return ip_addr.ip4_addr_isbroadcast(ipaddr.addr, netif); }
+		public static bool ip_addr_isbroadcast(ip_addr ipaddr, ip netif) { return ip_addr.ip4_addr_isbroadcast(ipaddr.addr, netif); }
 
 		public static bool ip_addr_netmask_valid(ip_addr netmask) { return ip_addr.ip4_addr_netmask_valid((netmask).addr); }
 
@@ -230,7 +230,7 @@ namespace uITron3
 		 * @param netif the network interface against which the address is checked
 		 * @return returns non-zero if the address is a broadcast address
 		 */
-		public static bool ip4_addr_isbroadcast(uint addr, netif netif)
+		public static bool ip4_addr_isbroadcast(uint addr, ip netif)
 		{
 			ip_addr ipaddr = new ip_addr(0);
 			ip_addr.ip4_addr_set_u32(ipaddr, addr);
@@ -242,7 +242,7 @@ namespace uITron3
 				return true;
 				/* no broadcast support on this network interface? */
 			}
-			else if ((netif.flags & netif.NETIF_FLAG_BROADCAST) == 0)
+			else if ((netif.flags & ip.NETIF_FLAG_BROADCAST) == 0)
 			{
 				/* the given address cannot be a broadcast address
 				 * nor can we check against any broadcast addresses */

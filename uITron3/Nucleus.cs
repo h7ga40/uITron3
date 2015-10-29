@@ -86,15 +86,13 @@ namespace uITron3
 			lwip.memp_init();
 			pbuf.pbuf_init(m_lwIP);
 
-			ip.ip_init(m_lwIP);
+			ip.ip_init(m_lwIP, ip_output);
 
 			udp.udp_init(m_lwIP);
 			tcp.tcp_init(m_lwIP);
-
-			netif.netif_init(m_lwIP, "", ipaddr, netmask, gw, netif_output);
 		}
 
-		private void netif_output(netif netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
+		private void ip_output(ip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
 		{
 			throw new NotImplementedException();
 		}

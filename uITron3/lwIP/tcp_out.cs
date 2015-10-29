@@ -1138,7 +1138,6 @@ namespace uITron3
 		private void tcp_output_segment(tcp_seg seg, tcp_pcb pcb)
 		{
 			ushort len;
-			netif netif;
 			pointer opts;
 
 			/** @bug Exclude retransmitted segments from this count. */
@@ -1178,7 +1177,7 @@ namespace uITron3
 #endif
 
 			/* Set retransmission timer running if it is not currently enabled 
-     This must be set before checking the route. */
+			   This must be set before checking the route. */
 			if (pcb.rtime == -1)
 			{
 				pcb.rtime = 0;
@@ -1188,12 +1187,7 @@ namespace uITron3
 			   calling ip.ip_route(). */
 			if (ip_addr.ip_addr_isany(pcb.local_ip))
 			{
-				netif = lwip.ip.ip_route(pcb.remote_ip);
-				if (netif == null)
-				{
-					return;
-				}
-				ip_addr.ip_addr_copy(pcb.local_ip, netif.ip_addr);
+				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip.ip_addr);
 			}
 
 			if (pcb.rttest == 0)
