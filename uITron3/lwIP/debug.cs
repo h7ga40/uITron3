@@ -74,7 +74,8 @@ namespace uITron3
 
 		internal static void LWIP_DEBUGF(uint flag, string format, params object[] args)
 		{
-			System.Diagnostics.Debug.Write(String.Format(format, args));
+			if ((flag & (~LWIP_DBG_TRACE)) != 0)
+				System.Diagnostics.Debug.Write(String.Format(format, args));
 		}
 
 		internal static bool LWIP_ERROR(string text, bool cond)
