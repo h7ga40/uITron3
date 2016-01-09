@@ -179,10 +179,8 @@ namespace uITron3
 			freed! */
 		public void PBUF_CHECK_FREE_OOSEQ()
 		{
-			do
-			{
-				if (pbuf_free_ooseq_pending != 0)
-				{
+			do {
+				if (pbuf_free_ooseq_pending != 0) {
 					/* pbuf_alloc() reported pbuf_type.PBUF_POOL to be empty . try to free some 
 					   ooseq queued pbufs now */
 					pbuf_free_ooseq();
@@ -194,10 +192,8 @@ namespace uITron3
 #if TCP_QUEUE_OOSEQ
 		private void PBUF_POOL_FREE_OOSEQ_QUEUE_CALL()
 		{
-			do
-			{
-				if (tcpip.tcpip_callback_with_block(pbuf_free_ooseq_callback, null, 0) != err_t.ERR_OK)
-				{
+			do {
+				if (tcpip.tcpip_callback_with_block(pbuf_free_ooseq_callback, null, 0) != err_t.ERR_OK) {
 					sys.SYS_ARCH_PROTECT(sys.old_level);
 					pbuf_free_ooseq_pending = 0;
 					sys.SYS_ARCH_UNPROTECT(sys.old_level);
@@ -225,11 +221,9 @@ namespace uITron3
 			pbuf_free_ooseq_pending = 0;
 			sys.SYS_ARCH_UNPROTECT(sys.old_level);
 
-			for (pcbc = tcp.tcp_active_pcbs; null != pcbc; pcbc = pcbc.next)
-			{
+			for (pcbc = tcp.tcp_active_pcbs; null != pcbc; pcbc = pcbc.next) {
 				tcp_pcb pcb = pcbc as tcp_pcb;
-				if ((null != pcb) && (null != pcb.ooseq))
-				{
+				if ((null != pcb) && (null != pcb.ooseq)) {
 					/** Free the ooseq pbufs of one PCB only */
 					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_free_ooseq: freeing out-of-sequence pbufs\n");
 					tcp.tcp_segs_free(pcb.ooseq);
@@ -266,8 +260,7 @@ namespace uITron3
 			pbuf_free_ooseq_pending = 1;
 			sys.SYS_ARCH_UNPROTECT(sys.old_level);
 
-			if (queued == 0)
-			{
+			if (queued == 0) {
 				/* queue a call to pbuf_free_ooseq if not already queued */
 				PBUF_POOL_FREE_OOSEQ_QUEUE_CALL();
 			}
@@ -313,140 +306,133 @@ namespace uITron3
 			lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_alloc(length={0})\n", length);
 
 			/* determine header offset */
-			switch (layer)
-			{
-				case pbuf_layer.PBUF_TRANSPORT:
-					/* add room for transport (often TCP) layer header */
-					offset = opt.PBUF_LINK_HLEN + pbuf.PBUF_IP_HLEN + pbuf.PBUF_TRANSPORT_HLEN;
-					break;
-				case pbuf_layer.PBUF_IP:
-					/* add room for IP layer header */
-					offset = opt.PBUF_LINK_HLEN + pbuf.PBUF_IP_HLEN;
-					break;
-				case pbuf_layer.PBUF_LINK:
-					/* add room for link layer header */
-					offset = opt.PBUF_LINK_HLEN;
-					break;
-				case pbuf_layer.PBUF_RAW:
-					offset = 0;
-					break;
-				default:
-					lwip.LWIP_ASSERT("pbuf_alloc: bad pbuf layer", false);
-					return null;
+			switch (layer) {
+			case pbuf_layer.PBUF_TRANSPORT:
+				/* add room for transport (often TCP) layer header */
+				offset = opt.PBUF_LINK_HLEN + pbuf.PBUF_IP_HLEN + pbuf.PBUF_TRANSPORT_HLEN;
+				break;
+			case pbuf_layer.PBUF_IP:
+				/* add room for IP layer header */
+				offset = opt.PBUF_LINK_HLEN + pbuf.PBUF_IP_HLEN;
+				break;
+			case pbuf_layer.PBUF_LINK:
+				/* add room for link layer header */
+				offset = opt.PBUF_LINK_HLEN;
+				break;
+			case pbuf_layer.PBUF_RAW:
+				offset = 0;
+				break;
+			default:
+				lwip.LWIP_ASSERT("pbuf_alloc: bad pbuf layer", false);
+				return null;
 			}
 
-			switch (type)
-			{
-				case pbuf_type.PBUF_POOL:
-					/* allocate head of pbuf chain into p */
-					p = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF_POOL));
-					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_alloc: allocated pbuf {0}\n", p);
-					if (p == null)
-					{
+			switch (type) {
+			case pbuf_type.PBUF_POOL:
+				/* allocate head of pbuf chain into p */
+				p = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF_POOL));
+				lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_alloc: allocated pbuf {0}\n", p);
+				if (p == null) {
+					PBUF_POOL_IS_EMPTY();
+					return null;
+				}
+				p.type = type;
+				p.next = null;
+
+				/* make the payload pointer point 'offset' bytes into pbuf data memory */
+				p.payload = lwip.LWIP_MEM_ALIGN((p + (pbuf.SIZEOF_STRUCT_PBUF + offset)));
+				lwip.LWIP_ASSERT("pbuf_alloc: pbuf p.payload properly aligned",
+						(p.payload.offset % opt.MEM_ALIGNMENT) == 0);
+				/* the total length of the pbuf chain is the requested size */
+				p.tot_len = length;
+				/* set the length of the first pbuf in the chain */
+				p.len = Math.Min(length, (ushort)(pbuf.PBUF_POOL_BUFSIZE_ALIGNED - lwip.LWIP_MEM_ALIGN_SIZE(offset)));
+				lwip.LWIP_ASSERT("check p.payload + p.len does not overflow pbuf",
+							(p.payload + p.len <=
+							 p + pbuf.SIZEOF_STRUCT_PBUF + pbuf.PBUF_POOL_BUFSIZE_ALIGNED));
+				lwip.LWIP_ASSERT("PBUF_POOL_BUFSIZE must be bigger than opt.MEM_ALIGNMENT",
+				  (pbuf.PBUF_POOL_BUFSIZE_ALIGNED - lwip.LWIP_MEM_ALIGN_SIZE(offset)) > 0);
+				/* set reference count (needed here in case we fail) */
+				p.@ref = 1;
+
+				/* now allocate the tail of the pbuf chain */
+
+				/* remember first pbuf for linkage in next iteration */
+				r = p;
+				/* remaining length to be allocated */
+				rem_len = length - p.len;
+				/* any remaining pbufs to be allocated? */
+				while (rem_len > 0) {
+					q = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF_POOL));
+					if (q == null) {
 						PBUF_POOL_IS_EMPTY();
+						/* free chain so far allocated */
+						pbuf_free(p);
+						/* bail out unsuccesfully */
 						return null;
 					}
-					p.type = type;
-					p.next = null;
-
-					/* make the payload pointer point 'offset' bytes into pbuf data memory */
-					p.payload = lwip.LWIP_MEM_ALIGN((p + (pbuf.SIZEOF_STRUCT_PBUF + offset)));
-					lwip.LWIP_ASSERT("pbuf_alloc: pbuf p.payload properly aligned",
-							(p.payload.offset % opt.MEM_ALIGNMENT) == 0);
-					/* the total length of the pbuf chain is the requested size */
-					p.tot_len = length;
-					/* set the length of the first pbuf in the chain */
-					p.len = Math.Min(length, (ushort)(pbuf.PBUF_POOL_BUFSIZE_ALIGNED - lwip.LWIP_MEM_ALIGN_SIZE(offset)));
+					q.type = type;
+					q.flags = 0;
+					q.next = null;
+					/* make previous pbuf point to this pbuf */
+					r.next = q;
+					/* set total length of this pbuf and next in chain */
+					lwip.LWIP_ASSERT("rem_len < max_u16_t", rem_len < 0xffff);
+					q.tot_len = (ushort)rem_len;
+					/* this pbuf length is pool size, unless smaller sized tail */
+					q.len = Math.Min((ushort)rem_len, (ushort)pbuf.PBUF_POOL_BUFSIZE_ALIGNED);
+					q.payload = (q + pbuf.SIZEOF_STRUCT_PBUF);
+					lwip.LWIP_ASSERT("pbuf_alloc: pbuf q.payload properly aligned",
+							(q.payload.offset % opt.MEM_ALIGNMENT) == 0);
 					lwip.LWIP_ASSERT("check p.payload + p.len does not overflow pbuf",
 								(p.payload + p.len <=
 								 p + pbuf.SIZEOF_STRUCT_PBUF + pbuf.PBUF_POOL_BUFSIZE_ALIGNED));
-					lwip.LWIP_ASSERT("PBUF_POOL_BUFSIZE must be bigger than opt.MEM_ALIGNMENT",
-					  (pbuf.PBUF_POOL_BUFSIZE_ALIGNED - lwip.LWIP_MEM_ALIGN_SIZE(offset)) > 0);
-					/* set reference count (needed here in case we fail) */
-					p.@ref = 1;
+					q.@ref = 1;
+					/* calculate remaining length to be allocated */
+					rem_len -= q.len;
+					/* remember this pbuf for linkage in next iteration */
+					r = q;
+				}
+				/* end of chain */
+				/*r.next = null;*/
 
-					/* now allocate the tail of the pbuf chain */
-
-					/* remember first pbuf for linkage in next iteration */
-					r = p;
-					/* remaining length to be allocated */
-					rem_len = length - p.len;
-					/* any remaining pbufs to be allocated? */
-					while (rem_len > 0)
-					{
-						q = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF_POOL));
-						if (q == null)
-						{
-							PBUF_POOL_IS_EMPTY();
-							/* free chain so far allocated */
-							pbuf_free(p);
-							/* bail out unsuccesfully */
-							return null;
-						}
-						q.type = type;
-						q.flags = 0;
-						q.next = null;
-						/* make previous pbuf point to this pbuf */
-						r.next = q;
-						/* set total length of this pbuf and next in chain */
-						lwip.LWIP_ASSERT("rem_len < max_u16_t", rem_len < 0xffff);
-						q.tot_len = (ushort)rem_len;
-						/* this pbuf length is pool size, unless smaller sized tail */
-						q.len = Math.Min((ushort)rem_len, (ushort)pbuf.PBUF_POOL_BUFSIZE_ALIGNED);
-						q.payload = (q + pbuf.SIZEOF_STRUCT_PBUF);
-						lwip.LWIP_ASSERT("pbuf_alloc: pbuf q.payload properly aligned",
-								(q.payload.offset % opt.MEM_ALIGNMENT) == 0);
-						lwip.LWIP_ASSERT("check p.payload + p.len does not overflow pbuf",
-									(p.payload + p.len <=
-									 p + pbuf.SIZEOF_STRUCT_PBUF + pbuf.PBUF_POOL_BUFSIZE_ALIGNED));
-						q.@ref = 1;
-						/* calculate remaining length to be allocated */
-						rem_len -= q.len;
-						/* remember this pbuf for linkage in next iteration */
-						r = q;
-					}
-					/* end of chain */
-					/*r.next = null;*/
-
-					break;
-				case pbuf_type.PBUF_RAM:
-					/* If pbuf is to be allocated in RAM, allocate memory for it. */
-					p = new pbuf(this, mem_malloc(lwip.LWIP_MEM_ALIGN_SIZE((ushort)(pbuf.SIZEOF_STRUCT_PBUF + offset)) + lwip.LWIP_MEM_ALIGN_SIZE(length)));
-					if (p == null)
-					{
-						return null;
-					}
-					/* Set up internal structure of the pbuf. */
-					p.payload = lwip.LWIP_MEM_ALIGN((p + pbuf.SIZEOF_STRUCT_PBUF + offset));
-					p.len = p.tot_len = length;
-					p.next = null;
-					p.type = type;
-
-					lwip.LWIP_ASSERT("pbuf_alloc: pbuf.payload properly aligned",
-						   (p.payload.offset % opt.MEM_ALIGNMENT) == 0);
-					break;
-				/* pbuf references existing (non-volatile static constant) ROM payload? */
-				case pbuf_type.PBUF_ROM:
-				/* pbuf references existing (externally allocated) RAM payload? */
-				case pbuf_type.PBUF_REF:
-					/* only allocate memory for the pbuf structure */
-					p = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF));
-					if (p == null)
-					{
-						lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
-									"pbuf_alloc: Could not allocate MEMP_PBUF for PBUF_{0}.\n",
-									(type == pbuf_type.PBUF_ROM) ? "ROM" : "REF");
-						return null;
-					}
-					/* caller must set this field properly, afterwards */
-					p.payload = null;
-					p.len = p.tot_len = length;
-					p.next = null;
-					p.type = type;
-					break;
-				default:
-					lwip.LWIP_ASSERT("pbuf_alloc: erroneous type", false);
+				break;
+			case pbuf_type.PBUF_RAM:
+				/* If pbuf is to be allocated in RAM, allocate memory for it. */
+				p = new pbuf(this, mem_malloc(lwip.LWIP_MEM_ALIGN_SIZE((ushort)(pbuf.SIZEOF_STRUCT_PBUF + offset)) + lwip.LWIP_MEM_ALIGN_SIZE(length)));
+				if (p == null) {
 					return null;
+				}
+				/* Set up internal structure of the pbuf. */
+				p.payload = lwip.LWIP_MEM_ALIGN((p + pbuf.SIZEOF_STRUCT_PBUF + offset));
+				p.len = p.tot_len = length;
+				p.next = null;
+				p.type = type;
+
+				lwip.LWIP_ASSERT("pbuf_alloc: pbuf.payload properly aligned",
+					   (p.payload.offset % opt.MEM_ALIGNMENT) == 0);
+				break;
+			/* pbuf references existing (non-volatile static constant) ROM payload? */
+			case pbuf_type.PBUF_ROM:
+			/* pbuf references existing (externally allocated) RAM payload? */
+			case pbuf_type.PBUF_REF:
+				/* only allocate memory for the pbuf structure */
+				p = new pbuf(this, memp_malloc(mempb_t.MEMP_PBUF));
+				if (p == null) {
+					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
+								"pbuf_alloc: Could not allocate MEMP_PBUF for PBUF_{0}.\n",
+								(type == pbuf_type.PBUF_ROM) ? "ROM" : "REF");
+					return null;
+				}
+				/* caller must set this field properly, afterwards */
+				p.payload = null;
+				p.len = p.tot_len = length;
+				p.next = null;
+				p.type = type;
+				break;
+			default:
+				lwip.LWIP_ASSERT("pbuf_alloc: erroneous type", false);
+				return null;
 			}
 			/* set reference count */
 			p.@ref = 1;
@@ -485,8 +471,7 @@ namespace uITron3
 						p.type == pbuf_type.PBUF_REF);
 
 			/* desired length larger than current length? */
-			if (new_len >= p.tot_len)
-			{
+			if (new_len >= p.tot_len) {
 				/* enlarging not yet supported */
 				return;
 			}
@@ -499,8 +484,7 @@ namespace uITron3
 			rem_len = new_len;
 			q = p;
 			/* should this pbuf be kept? */
-			while (rem_len > q.len)
-			{
+			while (rem_len > q.len) {
 				/* decrease remaining length by pbuf length */
 				rem_len -= q.len;
 				/* decrease total length indicator */
@@ -515,8 +499,7 @@ namespace uITron3
 
 			/* shrink allocated memory for pbuf_type.PBUF_RAM */
 			/* (other types merely adjust their length fields */
-			if ((q.type == pbuf_type.PBUF_RAM) && (rem_len != q.len))
-			{
+			if ((q.type == pbuf_type.PBUF_RAM) && (rem_len != q.len)) {
 				/* reallocate and adjust the length of the pbuf that will be split */
 				q = new pbuf(this, mem_trim(q, q.payload - q + rem_len));
 				lwip.LWIP_ASSERT("mem_trim returned q == null", q != null);
@@ -526,8 +509,7 @@ namespace uITron3
 			q.tot_len = q.len;
 
 			/* any remaining pbufs in chain? */
-			if (q.next != null)
-			{
+			if (q.next != null) {
 				/* free remaining pbufs in chain */
 				pbuf_free(q.next);
 			}
@@ -563,19 +545,16 @@ namespace uITron3
 			short increment_magnitude;
 
 			lwip.LWIP_ASSERT("p != null", p != null);
-			if ((header_size_increment == 0) || (p == null))
-			{
+			if ((header_size_increment == 0) || (p == null)) {
 				return 0;
 			}
 
-			if (header_size_increment < 0)
-			{
+			if (header_size_increment < 0) {
 				increment_magnitude = (short)-header_size_increment;
 				/* Check that we aren't going to move off the end of the pbuf */
 				if (lwip.LWIP_ERROR("increment_magnitude <= p.len", (increment_magnitude <= p.len))) return 1;
 			}
-			else
-			{
+			else {
 				increment_magnitude = header_size_increment;
 #if false
 				/* Can't assert these as some callers speculatively call
@@ -594,13 +573,11 @@ namespace uITron3
 			payload = p.payload;
 
 			/* pbuf types containing payloads? */
-			if (type == pbuf_type.PBUF_RAM || type == pbuf_type.PBUF_POOL)
-			{
+			if (type == pbuf_type.PBUF_RAM || type == pbuf_type.PBUF_POOL) {
 				/* set new payload pointer */
 				p.payload = p.payload - header_size_increment;
 				/* boundary check fails? */
-				if (p.payload < p + pbuf.SIZEOF_STRUCT_PBUF)
-				{
+				if (p.payload < p + pbuf.SIZEOF_STRUCT_PBUF) {
 					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
 					  "pbuf_header: failed as {0} < {1} (not enough space for new header size)\n",
 					  p.payload, (p + 1));
@@ -611,23 +588,19 @@ namespace uITron3
 				}
 				/* pbuf types refering to external payloads? */
 			}
-			else if (type == pbuf_type.PBUF_REF || type == pbuf_type.PBUF_ROM)
-			{
+			else if (type == pbuf_type.PBUF_REF || type == pbuf_type.PBUF_ROM) {
 				/* hide a header in the payload? */
-				if ((header_size_increment < 0) && (increment_magnitude <= p.len))
-				{
+				if ((header_size_increment < 0) && (increment_magnitude <= p.len)) {
 					/* increase payload pointer */
 					p.payload = p.payload - header_size_increment;
 				}
-				else
-				{
+				else {
 					/* cannot expand payload to front (yet!)
 					 * bail out unsuccesfully */
 					return 1;
 				}
 			}
-			else
-			{
+			else {
 				/* Unknown type */
 				lwip.LWIP_ASSERT("bad pbuf type", false);
 				return 1;
@@ -681,8 +654,7 @@ namespace uITron3
 			pbuf q;
 			byte count;
 
-			if (p == null)
-			{
+			if (p == null) {
 				lwip.LWIP_ASSERT("p != null", p != null);
 				/* if assertions are disabled, proceed with debug output */
 				lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
@@ -700,8 +672,7 @@ namespace uITron3
 			count = 0;
 			/* de-allocate all consecutive pbufs from the head of the chain that
 			 * obtain a zero reference count after decrementing*/
-			while (p != null)
-			{
+			while (p != null) {
 				ushort @ref;
 				sys.SYS_ARCH_DECL_PROTECT(sys.old_level);
 				/* Since decrementing @ref cannot be guaranteed to be a single machine operation
@@ -714,8 +685,7 @@ namespace uITron3
 				@ref = --(p.@ref);
 				sys.SYS_ARCH_UNPROTECT(sys.old_level);
 				/* this pbuf is no longer referenced to? */
-				if (@ref == 0)
-				{
+				if (@ref == 0) {
 					/* remember next pbuf in chain for next iteration */
 					q = p.next;
 					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_free: deallocating {0}\n", p);
@@ -730,18 +700,15 @@ namespace uITron3
 #endif // LWIP_SUPPORT_CUSTOM_PBUF
 					{
 						/* is this a pbuf from the pool? */
-						if (type == pbuf_type.PBUF_POOL)
-						{
+						if (type == pbuf_type.PBUF_POOL) {
 							memp_free(mempb_t.MEMP_PBUF_POOL, p);
 							/* is this a ROM or RAM referencing pbuf? */
 						}
-						else if (type == pbuf_type.PBUF_ROM || type == pbuf_type.PBUF_REF)
-						{
+						else if (type == pbuf_type.PBUF_ROM || type == pbuf_type.PBUF_REF) {
 							memp_free(mempb_t.MEMP_PBUF, p);
 							/* type == pbuf_type.PBUF_RAM */
 						}
-						else
-						{
+						else {
 							mem_free(p);
 						}
 					}
@@ -751,8 +718,7 @@ namespace uITron3
 					/* p.@ref > 0, this pbuf is still referenced to */
 					/* (and so the remaining pbufs in chain as well) */
 				}
-				else
-				{
+				else {
 					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_free: {0} has @ref {1}, ending here.\n", p, @ref);
 					/* stop walking through the chain */
 					p = null;
@@ -775,8 +741,7 @@ namespace uITron3
 			byte len;
 
 			len = 0;
-			while (p != null)
-			{
+			while (p != null) {
 				++len;
 				p = p.next;
 			}
@@ -793,8 +758,7 @@ namespace uITron3
 		{
 			sys.SYS_ARCH_DECL_PROTECT(sys.old_level);
 			/* pbuf given? */
-			if (p != null)
-			{
+			if (p != null) {
 				sys.SYS_ARCH_PROTECT(sys.old_level);
 				++(p.@ref);
 				sys.SYS_ARCH_UNPROTECT(sys.old_level);
@@ -819,8 +783,7 @@ namespace uITron3
 				return;
 
 			/* proceed to last pbuf of chain */
-			for (p = h; p.next != null; p = p.next)
-			{
+			for (p = h; p.next != null; p = p.next) {
 				/* add total length of second chain to all totals of first chain */
 				p.tot_len += t.tot_len;
 			}
@@ -875,8 +838,7 @@ namespace uITron3
 			/* tail */
 			q = p.next;
 			/* pbuf has successor in chain? */
-			if (q != null)
-			{
+			if (q != null) {
 				/* assert tot_len invariant: (p.tot_len == p.len + (p.next? p.next.tot_len: 0) */
 				lwip.LWIP_ASSERT("p.tot_len == p.len + q.tot_len", q.tot_len == p.tot_len - p.len);
 				/* enforce invariant if assertion is disabled */
@@ -888,8 +850,7 @@ namespace uITron3
 				/* q is no longer referenced by p, free it */
 				lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE, "pbuf_dechain: unreferencing {0}\n", q);
 				tail_gone = pbuf_free(q);
-				if (tail_gone > 0)
-				{
+				if (tail_gone > 0) {
 					lwip.LWIP_DEBUGF(opt.PBUF_DEBUG | lwip.LWIP_DBG_TRACE,
 								"pbuf_dechain: deallocated {0} (as it is no longer referenced)\n", q);
 				}
@@ -931,16 +892,13 @@ namespace uITron3
 				return err_t.ERR_ARG;
 
 			/* iterate through pbuf chain */
-			do
-			{
+			do {
 				/* copy one part of the original chain */
-				if ((p_to.len - offset_to) >= (p_from.len - offset_from))
-				{
+				if ((p_to.len - offset_to) >= (p_from.len - offset_from)) {
 					/* complete current p_from fits into current p_to */
 					len = (ushort)(p_from.len - offset_from);
 				}
-				else
-				{
+				else {
 					/* current p_from does not fit into current p_to */
 					len = (ushort)(p_to.len - offset_to);
 				}
@@ -949,29 +907,25 @@ namespace uITron3
 				offset_from += len;
 				lwip.LWIP_ASSERT("offset_to <= p_to.len", offset_to <= p_to.len);
 				lwip.LWIP_ASSERT("offset_from <= p_from.len", offset_from <= p_from.len);
-				if (offset_from >= p_from.len)
-				{
+				if (offset_from >= p_from.len) {
 					/* on to next p_from (if any) */
 					offset_from = 0;
 					p_from = p_from.next;
 				}
-				if (offset_to == p_to.len)
-				{
+				if (offset_to == p_to.len) {
 					/* on to next p_to (if any) */
 					offset_to = 0;
 					p_to = p_to.next;
 					if (lwip.LWIP_ERROR("p_to != null", (p_to != null) || (p_from == null))) return err_t.ERR_ARG;
 				}
 
-				if ((p_from != null) && (p_from.len == p_from.tot_len))
-				{
+				if ((p_from != null) && (p_from.len == p_from.tot_len)) {
 					/* don't copy more than one packet! */
 					if (lwip.LWIP_ERROR("pbuf_copy() does not allow packet queues!\n",
 						(p_from.next == null)))
 						return err_t.ERR_VAL;
 				}
-				if ((p_to != null) && (p_to.len == p_to.tot_len))
-				{
+				if ((p_to != null) && (p_to.len == p_to.tot_len)) {
 					/* don't copy more than one packet! */
 					if (lwip.LWIP_ERROR("pbuf_copy() does not allow packet queues!\n",
 						(p_to.next == null)))
@@ -1005,21 +959,17 @@ namespace uITron3
 
 			left = 0;
 
-			if ((buf == null) || (dataptr == null))
-			{
+			if ((buf == null) || (dataptr == null)) {
 				return 0;
 			}
 
 			/* Note some systems use byte copy if dataptr or one of the pbuf payload pointers are unaligned. */
-			for (p = buf; len != 0 && p != null; p = p.next)
-			{
-				if ((offset != 0) && (offset >= p.len))
-				{
+			for (p = buf; len != 0 && p != null; p = p.next) {
+				if ((offset != 0) && (offset >= p.len)) {
 					/* don't copy from this buffer . on to the next */
 					offset -= p.len;
 				}
-				else
-				{
+				else {
 					/* copy from this buffer. maybe only partially. */
 					buf_copy_len = (ushort)(p.len - offset);
 					if (buf_copy_len > len)
@@ -1055,18 +1005,15 @@ namespace uITron3
 			if (lwip.LWIP_ERROR("pbuf_take: invalid buf", (buf != null))) return 0;
 			if (lwip.LWIP_ERROR("pbuf_take: invalid dataptr", (dataptr != null))) return 0;
 
-			if ((buf == null) || (dataptr == null) || (buf.tot_len < len))
-			{
+			if ((buf == null) || (dataptr == null) || (buf.tot_len < len)) {
 				return err_t.ERR_ARG;
 			}
 
 			/* Note some systems use byte copy if dataptr or one of the pbuf payload pointers are unaligned. */
-			for (p = buf; total_copy_len != 0; p = p.next)
-			{
+			for (p = buf; total_copy_len != 0; p = p.next) {
 				lwip.LWIP_ASSERT("pbuf_take: invalid pbuf", p != null);
 				buf_copy_len = total_copy_len;
-				if (buf_copy_len > p.len)
-				{
+				if (buf_copy_len > p.len) {
 					/* this pbuf cannot hold all remaining data */
 					buf_copy_len = p.len;
 				}
@@ -1095,13 +1042,11 @@ namespace uITron3
 		{
 			pbuf q;
 			err_t err;
-			if (p.next == null)
-			{
+			if (p.next == null) {
 				return p;
 			}
 			q = pbuf_alloc(layer, p.tot_len, pbuf_type.PBUF_RAM);
-			if (q == null)
-			{
+			if (q == null) {
 				/* @todo: what do we do now? */
 				return p;
 			}
@@ -1135,15 +1080,13 @@ namespace uITron3
 			//lwip.LWIP_ASSERT("chksum != null", chksum != null);
 			lwip.LWIP_ASSERT("len != 0", len != 0);
 
-			if ((start_offset >= p.len) || (start_offset + len > p.len))
-			{
+			if ((start_offset >= p.len) || (start_offset + len > p.len)) {
 				return err_t.ERR_ARG;
 			}
 
 			dst_ptr = ((pointer)p.payload) + start_offset;
 			copy_chksum = lwip.LWIP_CHKSUM_COPY(dst_ptr, dataptr, len);
-			if ((start_offset & 1) != 0)
-			{
+			if ((start_offset & 1) != 0) {
 				copy_chksum = lwip.SWAP_BYTES_IN_WORD(copy_chksum);
 			}
 			acc = chksum;
@@ -1166,14 +1109,12 @@ namespace uITron3
 			pbuf q = p;
 
 			/* get the correct pbuf */
-			while ((q != null) && (q.len <= copy_from))
-			{
+			while ((q != null) && (q.len <= copy_from)) {
 				copy_from -= q.len;
 				q = q.next;
 			}
 			/* return requested data if pbuf is OK */
-			if ((q != null) && (q.len > copy_from))
-			{
+			if ((q != null) && (q.len > copy_from)) {
 				return (q.payload)[copy_from];
 			}
 			return 0;
@@ -1194,21 +1135,17 @@ namespace uITron3
 			pbuf q = p;
 
 			/* get the correct pbuf */
-			while ((q != null) && (q.len <= start))
-			{
+			while ((q != null) && (q.len <= start)) {
 				start -= q.len;
 				q = q.next;
 			}
 			/* return requested data if pbuf is OK */
-			if ((q != null) && (q.len > start))
-			{
+			if ((q != null) && (q.len > start)) {
 				ushort i;
-				for (i = 0; i < n; i++)
-				{
+				for (i = 0; i < n; i++) {
 					byte a = pbuf_get_at(q, (ushort)(start + i));
 					byte b = (s2)[i];
-					if (a != b)
-					{
+					if (a != b) {
 						return (ushort)(i + 1);
 					}
 				}
@@ -1231,17 +1168,13 @@ namespace uITron3
 		{
 			ushort i;
 			ushort max = (ushort)(p.tot_len - mem_len);
-			if (p.tot_len >= mem_len + start_offset)
-			{
-				for (i = start_offset; i <= max;)
-				{
+			if (p.tot_len >= mem_len + start_offset) {
+				for (i = start_offset; i <= max;) {
 					ushort plus = pbuf_memcmp(p, i, mem, mem_len);
-					if (plus == 0)
-					{
+					if (plus == 0) {
 						return i;
 					}
-					else
-					{
+					else {
 						i += plus;
 					}
 				}
@@ -1262,13 +1195,11 @@ namespace uITron3
 		public static ushort pbuf_strstr(pbuf p, pointer substr)
 		{
 			int substr_len;
-			if ((substr == null) || (substr[0] == 0) || (p.tot_len == 0xFFFF))
-			{
+			if ((substr == null) || (substr[0] == 0) || (p.tot_len == 0xFFFF)) {
 				return 0xFFFF;
 			}
 			substr_len = pointer.strlen(substr);
-			if (substr_len >= 0xFFFF)
-			{
+			if (substr_len >= 0xFFFF) {
 				return 0xFFFF;
 			}
 			return pbuf_memfind(p, substr, (ushort)substr_len, 0);

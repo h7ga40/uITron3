@@ -13,5 +13,6 @@ namespace uITron3
 		bool Dispatch();
 		void PushContext();
 		void PopContext();
+		void Exit();
 	}
 }

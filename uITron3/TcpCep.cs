@@ -9,8 +9,9 @@ namespace uITron3
 {
 	public struct T_TCP_CCEP
 	{
+		public const ushort TCP_PORTANY = 0;
+
 		public ATR cepatr;
-		public T_IPV4EP myaddr;
 		public CepCallback callback;
 		public object exinf;
 	}
@@ -43,9 +44,7 @@ namespace uITron3
 		LinkedList<Task> m_SendTaskQueue = new LinkedList<Task>();
 		LinkedList<Task> m_RecvTaskQueue = new LinkedList<Task>();
 
-		Queue<pbuf> m_SendDataQueue = new Queue<pbuf>();
-		pbuf m_SendPBuf;
-		pbuf m_SendPBufPos;
+		pointer m_SendPBuf;
 		int m_SendPos;
 		int m_SendLen;
 		Queue<pbuf> m_RecvDataQueue = new Queue<pbuf>();
@@ -60,8 +59,6 @@ namespace uITron3
 
 		public TcpCep(ID tcpid, ref T_TCP_CCEP pk_ctcp, Nucleus pNucleus, lwip lwip)
 		{
-			ip_addr addr = new ip_addr(0);
-
 			m_CepID = tcpid;
 			m_ctcp = pk_ctcp;
 			m_Nucleus = pNucleus;
@@ -70,9 +67,6 @@ namespace uITron3
 			m_Pcb = m_lwIP.tcp.tcp_new();
 			tcp.tcp_arg(m_Pcb, this);
 			tcp.tcp_err(m_Pcb, Error);
-
-			addr.addr = lwip.lwip_htonl(pk_ctcp.myaddr.ipaddr);
-			m_lwIP.tcp.tcp_bind(m_Pcb, addr, lwip.lwip_htons(pk_ctcp.myaddr.portno));
 		}
 
 		public ID CepID { get { return m_CepID; } }
@@ -90,16 +84,55 @@ namespace uITron3
 
 		public ER Connect(T_IPV4EP p_myaddr, T_IPV4EP p_dstaddr, TMO tmout)
 		{
+			err_t err;
+			ip_addr ma = new ip_addr(0);
 			ip_addr sa = new ip_addr(0);
 
-			sa.addr = lwip.lwip_htonl(p_dstaddr.ipaddr);
-
-			err_t err = m_lwIP.tcp.tcp_connect(m_Pcb, sa, lwip.lwip_htons(p_dstaddr.portno), Connected);
-
-			if (err == err_t.ERR_OK)
-				return ER.E_OK;
-			else
+			ma.addr = lwip.lwip_htonl(p_myaddr.ipaddr);
+			err = m_lwIP.tcp.tcp_bind(m_Pcb, ma, lwip.lwip_htons(p_myaddr.portno));
+			if (err != err_t.ERR_OK)
 				return ER.E_OBJ;
+
+			sa.addr = lwip.lwip_htonl(p_dstaddr.ipaddr);
+			err = m_lwIP.tcp.tcp_connect(m_Pcb, sa, lwip.lwip_htons(p_dstaddr.portno), Connected);
+			if (err != err_t.ERR_OK)
+				return ER.E_OBJ;
+
+			Task task = m_Nucleus.GetTask(ID.TSK_SELF);
+
+			if ((tmout != 0) && (task == null))
+				return ER.E_CTX;
+
+			if (task == null)
+				return ER.E_TMOUT;
+
+			if (tmout == 0)
+				return ER.E_TMOUT;
+
+			SetState(true, new TMO(tcp.TCP_TMR_INTERVAL), task, Intarval);
+
+			ER ret = task.Wait(m_SendTaskQueue, TSKWAIT.TTW_TCP, m_CepID, tmout);
+
+			switch (ret) {
+			case ER.E_OK:
+				if ((m_TPcb == null) || (m_TPcb.state != tcp_state.ESTABLISHED))
+					return ER.E_RLWAI;
+				break;
+			case ER.E_TMOUT:
+				return ER.E_TMOUT;
+			default:
+				return ER.E_RLWAI;
+			}
+
+			return ER.E_OK;
+		}
+
+		private void Intarval(object data)
+		{
+			if ((m_Pcb == null) || (m_Pcb.state == tcp_state.CLOSED))
+				SetState(false);
+
+			m_lwIP.tcp.tcp_tmr();
 		}
 
 		private static err_t Connected(object arg, tcp_pcb tpcb, err_t err)
@@ -111,7 +144,22 @@ namespace uITron3
 				return err;
 			}
 
-			_this.NewSession(tpcb);
+			Task wtask = null;
+			foreach (Task task in _this.m_SendTaskQueue) {
+				if ((task.rtsk.tskwait != TSKWAIT.TTW_TCP) ||
+					(task.rtsk.wid != _this.m_CepID))
+					continue;
+
+				wtask = task;
+				break;
+			}
+
+			if (wtask != null) {
+				_this.m_SendTaskQueue.Remove(wtask);
+
+				_this.NewSession(tpcb);
+				wtask.ReleaseWait();
+			}
 
 			return err_t.ERR_OK;
 		}
@@ -141,7 +189,7 @@ namespace uITron3
 			if (p_data == null)
 				return ER.E_PAR;
 
-			if ((m_SendMode == BufferMode.None) || (m_SendMode == BufferMode.NormalCopy))
+			if ((m_SendMode != BufferMode.None) && (m_SendMode != BufferMode.NormalCopy))
 				return ER.E_OBJ;
 
 			Task task = m_Nucleus.GetTask(ID.TSK_SELF);
@@ -149,13 +197,12 @@ namespace uITron3
 			if ((tmout != 0) && (task == null))
 				return ER.E_CTX;
 
-			if (p_data == null)
-				return ER.E_PAR;
-
-			pbuf buf = m_lwIP.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, (ushort)len, pbuf_type.PBUF_POOL);
-			if ((m_SendTaskQueue.First == null) && (buf != null)) {
-				result = CopyToPBuf(buf, p_data, len);
-				m_SendDataQueue.Enqueue(buf);
+			int space = tcp.tcp_sndbuf(m_TPcb);
+			if ((m_SendPBuf == null) && (space >= len)) {
+				m_SendPBuf = p_data;
+				m_SendPos = 0;
+				m_SendLen = len;
+				SentData(this, m_TPcb, (ushort)space);
 			}
 			else {
 				if (task == null)
@@ -168,11 +215,13 @@ namespace uITron3
 
 				switch (ret) {
 				case ER.E_OK:
-					buf = m_lwIP.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, (ushort)len, pbuf_type.PBUF_POOL);
-					if (buf == null)
+					if (m_SendPBuf != null)
 						return ER.E_RLWAI;
-					result = CopyToPBuf(buf, p_data, len);
-					m_SendDataQueue.Enqueue(buf);
+
+					m_SendPBuf = p_data;
+					m_SendPos = 0;
+					m_SendLen = len;
+					SentData(this, m_TPcb, tcp.tcp_sndbuf(m_TPcb));
 					break;
 				case ER.E_TMOUT:
 					return ER.E_TMOUT;
@@ -203,26 +252,12 @@ namespace uITron3
 			return pos;
 		}
 
-		public ER HostToNetwork(out pbuf p_data)
-		{
-			p_data = m_SendDataQueue.Dequeue();
-
-			if (m_SendTaskQueue.First != null) {
-				Task task = m_SendTaskQueue.First.Value;
-				m_SendTaskQueue.RemoveFirst();
-
-				if (!task.ReleaseWait())
-					return ER.E_RLWAI;
-			}
-
-			return ER.E_OK;
-		}
-
 		public ER NetworkToHost(pbuf pk_data)
 		{
 			if (pk_data == null)
 				return ER.E_PAR;
 
+			m_lwIP.pbuf_ref(pk_data);
 			m_RecvDataQueue.Enqueue(pk_data);
 
 			if (m_RecvTaskQueue.First != null) {
@@ -231,6 +266,9 @@ namespace uITron3
 
 				if (!task.ReleaseWait())
 					return ER.E_RLWAI;
+			}
+			else {
+				m_ctcp.callback(m_CepID, FN.TFN_TCP_RCV_DAT, null);
 			}
 
 			return ER.E_OK;
@@ -244,7 +282,7 @@ namespace uITron3
 			if (p_data == null)
 				return ER.E_PAR;
 
-			if ((m_RecvMode == BufferMode.None) || (m_RecvMode == BufferMode.NormalCopy))
+			if ((m_RecvMode != BufferMode.None) && (m_RecvMode != BufferMode.NormalCopy))
 				return ER.E_OBJ;
 
 			Task task = m_Nucleus.GetTask(ID.TSK_SELF);
@@ -282,6 +320,25 @@ namespace uITron3
 			return (ER)result;
 		}
 
+		public ER ReceiveDataNblk(pointer p_data, int len)
+		{
+			int result = 0;
+
+			if (p_data == null)
+				return ER.E_PAR;
+
+			if ((m_RecvMode != BufferMode.None) && (m_RecvMode != BufferMode.NormalCopy))
+				return ER.E_OBJ;
+
+			result = CopyRecvData(p_data, len);
+			if (result == 0)
+				return ER.E_WBLK;
+
+			m_RecvMode = BufferMode.NormalCopy;
+
+			return (ER)result;
+		}
+
 		private int CopyRecvData(pointer p_data, int len)
 		{
 			int spos = 0, rest = len;
@@ -290,24 +347,37 @@ namespace uITron3
 			pbuf p = m_RecvPBufPos, q;
 
 			do {
-				for (q = p; q != null; q = q.next) {
-					int tmp = rest;
+				for (q = p; q != null; q = q.next, dpos = 0) {
+					int tmp = dpos + rest;
 					if (tmp > q.len)
 						tmp = q.len;
+					tmp -= dpos;
 
 					pointer.memcpy(p_data + spos, q.payload + dpos, tmp);
 					spos += tmp;
 					dpos += tmp;
 					rest -= tmp;
+					if (rest == 0) {
+						if (dpos == q.len) {
+							q = q.next;
+							dpos = 0;
+							if (q == null) {
+								if (buf != null)
+									m_lwIP.pbuf_free(buf);
+								buf = p = (m_RecvDataQueue.Count > 0) ? m_RecvDataQueue.Dequeue() : null;
+							}
+						}
+						goto end;
+					}
 				}
-				m_lwIP.pbuf_free(buf);
-				if (rest == 0)
-					break;
-				buf = p = m_RecvDataQueue.Dequeue();
+				if (buf != null)
+					m_lwIP.pbuf_free(buf);
+				buf = p = (m_RecvDataQueue.Count > 0) ? m_RecvDataQueue.Dequeue() : null;
 			} while (p != null);
 
-			m_RecvPBuf = p;
-			m_RecvPBufPos = q;
+		end:
+			m_RecvPBuf = buf;
+			m_RecvPBufPos = p;
 			m_RecvPos = dpos;
 
 			return spos;
@@ -321,7 +391,7 @@ namespace uITron3
 			//if (p_data == null)
 			//	return ER.E_PAR;
 
-			if ((m_SendMode == BufferMode.None) || (m_SendMode == BufferMode.ReduceCopy))
+			if ((m_SendMode != BufferMode.None) && (m_SendMode != BufferMode.ReduceCopy))
 				return ER.E_OBJ;
 
 			Task task = m_Nucleus.GetTask(ID.TSK_SELF);
@@ -396,7 +466,7 @@ namespace uITron3
 			if (p_data == null)
 				return ER.E_PAR;
 
-			if ((m_RecvMode == BufferMode.None) || (m_RecvMode == BufferMode.ReduceCopy))
+			if ((m_RecvMode != BufferMode.None) && (m_RecvMode != BufferMode.ReduceCopy))
 				return ER.E_OBJ;
 
 			Task task = m_Nucleus.GetTask(ID.TSK_SELF);
@@ -524,52 +594,44 @@ namespace uITron3
 			return err_t.ERR_OK;
 		}
 
-		private err_t SentData(object arg, tcp_pcb tpcb, ushort sentlen)
+		private err_t SentData(object arg, tcp_pcb tpcb, ushort space)
 		{
 			err_t err = err_t.ERR_OK;
-
-			m_SendPos += sentlen;
-			m_SendLen -= sentlen;
-
+			int rest = space;
+			int pos = m_SendPos;
+			pointer buf = m_SendPBuf;
 			int len = m_SendLen;
-			if (len == 0) {
-				if (m_SendPBuf != null)
-					m_lwIP.pbuf_free(m_SendPBuf);
-				HostToNetwork(out m_SendPBuf);
-				m_SendPBufPos = m_SendPBuf;
-				m_SendPos = 0;
-				if (m_SendPBuf == null) {
-					m_SendLen = 0;
-					return err_t.ERR_OK;
-				}
-				m_SendLen = m_SendPBuf.tot_len;
-			}
-			else if (len < 0) {
-				m_lwIP.tcp.tcp_close(m_TPcb);
-				return err_t.ERR_ABRT;
-			}
 
-			int buf_len = tcp.tcp_sndbuf(tpcb);
-			if (len > buf_len) len = buf_len;
-
-			int pos = 0, rest = len;
-			pbuf q;
-			for (q = m_SendPBufPos; q != null; q = q.next) {
+			if (buf != null) {
 				int tmp = rest;
-				if (tmp > q.len)
-					tmp = q.len;
+				if (tmp > len)
+					tmp = len;
 
-				err = m_lwIP.tcp.tcp_write(m_TPcb, q.payload, (ushort)tmp, 1);
+				err = m_lwIP.tcp.tcp_write(m_TPcb, new pointer(buf, pos), (ushort)tmp, 0);
 				if (err != err_t.ERR_OK)
-					break;
+					return err;
 
 				pos += tmp;
 				rest -= tmp;
+				if (pos == len) {
+					pos = 0;
+					buf = null;
+					len = 0;
+			}
 			}
 
-			if (q == null)
-				m_lwIP.pbuf_free(m_SendPBuf);
-			m_SendPBufPos = q;
+			m_SendPBuf = buf;
+			m_SendPos = pos;
+			m_SendLen = len;
+
+			if ((m_SendPBuf == null) && (rest > 0)) {
+				if (m_SendTaskQueue.First != null) {
+					Task task = m_SendTaskQueue.First.Value;
+					m_SendTaskQueue.RemoveFirst();
+
+					task.ReleaseWait();
+				}
+			}
 
 			return err;
 		}
@@ -578,7 +640,23 @@ namespace uITron3
 		{
 			TcpCep _this = (TcpCep)arg;
 
-			_this.m_lwIP.tcp.tcp_close(_this.m_TPcb);
+			Task wtask = null;
+			foreach (Task task in _this.m_SendTaskQueue) {
+				if ((task.rtsk.tskwait != TSKWAIT.TTW_TCP) ||
+					(task.rtsk.wid != _this.m_CepID))
+					continue;
+
+				wtask = task;
+				break;
+			}
+
+			bool ok = false;
+			if (wtask != null) {
+				ok = wtask.ReleaseWait();
+			}
+
+			if (_this.m_TPcb != null)
+				_this.m_lwIP.tcp.tcp_close(_this.m_TPcb);
 		}
 	}
 

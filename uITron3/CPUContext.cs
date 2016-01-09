@@ -246,5 +246,10 @@ namespace uITron3
 		{
 			m_Task = null;
 		}
+
+		public void Exit()
+		{
+			m_Thread.Abort();
+		}
 	}
 }

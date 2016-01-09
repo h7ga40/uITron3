@@ -90,37 +90,10 @@ namespace uITron3
 		public const byte SOF_INHERITED = (SOF_REUSEADDR | SOF_KEEPALIVE | SOF_LINGER);/*|SOF_DEBUG|SOF_DONTROUTE|SOF_OOBINLINE*/
 	}
 
-	public class ip_hdr : pointer
-	{
-		public new const int length = 20;
-
-		public ip_hdr(byte[] buffer, int offset)
-			: base(buffer, offset)
-		{
-		}
-
-		public ip_hdr(byte[] buffer)
-			: this(buffer, 0)
-		{
-		}
-
-		public ip_hdr(pointer buffer)
-			: this(buffer.data, buffer.offset)
-		{
-		}
-
-		public static byte IPH_HL(ip_hdr hdr) { return 5/*(byte)((hdr)._v_hl & 0x0f)*/; }
-		public static byte IPH_PROTO(ip_hdr hdr) { return 4/*((hdr)._proto)*/; }
-
-		public ip_addr dest = new ip_addr(new byte[ip_addr.length]);
-		public ip_addr src = new ip_addr(new byte[ip_addr.length]);
-	}
-
 	public delegate void netif_output_t(lwip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto);
 
 	public partial class lwip
 	{
-		internal const int IP_HLEN = ip_hdr.length;
 		public const int IP_PROTO_ICMP = 1;
 		public const int IP_PROTO_IGMP = 2;
 		public const int IP_PROTO_UDP = 17;
@@ -229,15 +202,6 @@ namespace uITron3
 			 gets altered as the packet is passed down the stack */
 			lwip.LWIP_ASSERT("p.ref == 1", p.@ref == 1);
 
-			/* generate IP header */
-			if (lwip.pbuf_header(p, lwip.IP_HLEN) != 0) {
-				lwip.LWIP_DEBUGF(opt.IP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS, "lwip.ip_output: not enough room for IP header in pbuf\n");
-
-				++lwip_stats.ip.err;
-				//snmp.snmp_inc_ipoutdiscards();
-				return err_t.ERR_BUF;
-			}
-
 			++lwip_stats.ip.xmit;
 
 			return output(this, p, src, dest, ttl, tos, proto);
@@ -291,7 +255,7 @@ namespace uITron3
 				case lwip.IP_PROTO_UDPLITE:
 #endif // LWIP_UDPLITE
 					//snmp.snmp_inc_ipindelivers();
-					udp.udp_input(p, this);
+					udp.udp_input(p, this, proto == lwip.IP_PROTO_UDPLITE);
 					break;
 #endif // LWIP_UDP
 #if LWIP_TCP
@@ -361,19 +325,19 @@ namespace uITron3
 			return err_t.ERR_OK;
 		}
 
-		internal void input(byte[] packet, ip_addr srcn, ip_addr destn, byte proto)
+		internal void input(pointer packet, int length, ip_addr srcn, ip_addr destn, byte proto)
 		{
 			ip_addr src = new ip_addr(lwip.lwip_htonl(srcn.addr));
 			ip_addr dest = new ip_addr(lwip.lwip_htonl(destn.addr));
-			pbuf p = pbuf_alloc(pbuf_layer.PBUF_RAW, (ushort)packet.Length, pbuf_type.PBUF_POOL);
-			int pos = 0, rest = packet.Length;
+			pbuf p = pbuf_alloc(pbuf_layer.PBUF_RAW, (ushort)length, pbuf_type.PBUF_POOL);
+			int pos = 0, rest = length;
 
 			for (pbuf q = p; q != null; q = q.next) {
 				int len = rest;
 				if (len > q.len)
 					len = q.len;
 
-				Buffer.BlockCopy(packet, pos, q.payload.data, q.payload.offset, len);
+				pointer.memcpy(q.payload, new pointer(packet, pos), len);
 				pos += len;
 				rest -= len;
 			}

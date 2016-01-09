@@ -58,7 +58,6 @@ namespace uITron3
 		   function. */
 		public tcp_seg inseg;
 		public tcp_hdr tcphdr;
-		public ip_hdr iphdr;
 		public uint seqno, ackno;
 		public byte flags;
 		public ushort tcplen;
@@ -93,26 +92,15 @@ namespace uITron3
 			++lwip.lwip_stats.tcp.recv;
 			////snmp.snmp_inc_tcpinsegs();
 
-			iphdr = new ip_hdr(p.payload);
-			tcphdr = new tcp_hdr(p.payload + ip_hdr.IPH_HL(iphdr) * 4);
+			tcphdr = new tcp_hdr(p.payload);
 
 #if TCP_INPUT_DEBUG
 			tcp_debug_print(tcphdr);
 #endif
 
-			/* remove header from payload */
-			if ((lwip.pbuf_header(p, (short)-(ip_hdr.IPH_HL(iphdr) * 4))) != 0 || (p.tot_len < tcp_hdr.length))
-			{
-				/* drop short packets */
-				lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: short packet ({0} bytes) discarded\n", p.tot_len);
-				++lwip.lwip_stats.tcp.lenerr;
-				goto dropped;
-			}
-
 			/* Don't even process incoming broadcasts/multicasts. */
 			if (ip_addr.ip_addr_isbroadcast(lwip.current_iphdr_dest, inp) ||
-				ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest))
-			{
+				ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest)) {
 				++lwip.lwip_stats.tcp.proterr;
 				goto dropped;
 			}
@@ -120,8 +108,7 @@ namespace uITron3
 #if CHECKSUM_CHECK_TCP
 			/* Verify TCP checksum. */
 			if (lwip.inet_chksum_pseudo(p, lwip.ip_current_src_addr(), lwip.ip_current_dest_addr(),
-				lwip.IP_PROTO_TCP, p.tot_len) != 0)
-			{
+				lwip.IP_PROTO_TCP, p.tot_len) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: packet discarded due to failing checksum 0x{0:X4}\n",
 					lwip.inet_chksum_pseudo(p, lwip.ip_current_src_addr(), lwip.ip_current_dest_addr(),
 					lwip.IP_PROTO_TCP, p.tot_len));
@@ -136,8 +123,7 @@ namespace uITron3
 			/* Move the payload pointer in the pbuf so that it points to the
 			   TCP data instead of the TCP header. */
 			hdrlen = (byte)tcp_hdr.TCPH_HDRLEN(tcphdr);
-			if (lwip.pbuf_header(p, (short)-(hdrlen * 4)) != 0)
-			{
+			if (lwip.pbuf_header(p, (short)-(hdrlen * 4)) != 0) {
 				/* drop short packets */
 				lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: short packet\n");
 				++lwip.lwip_stats.tcp.lenerr;
@@ -159,23 +145,20 @@ namespace uITron3
 			prev = null;
 
 
-			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
+			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 				lwip.LWIP_ASSERT("tcp_input: active pcb.state != tcp_state.CLOSED", pcb.state != tcp_state.CLOSED);
 				lwip.LWIP_ASSERT("tcp_input: active pcb.state != TIME-WAIT", pcb.state != tcp_state.TIME_WAIT);
 				lwip.LWIP_ASSERT("tcp_input: active pcb.state != tcp_state.LISTEN", pcb.state != tcp_state.LISTEN);
 				if (pcb.remote_port == tcphdr.src &&
 					pcb.local_port == tcphdr.dest &&
 					ip_addr.ip_addr_cmp(pcb.remote_ip, lwip.current_iphdr_src) &&
-					ip_addr.ip_addr_cmp(pcb.local_ip, lwip.current_iphdr_dest))
-				{
+					ip_addr.ip_addr_cmp(pcb.local_ip, lwip.current_iphdr_dest)) {
 
 					/* Move this PCB to the front of the list so that subsequent
 					   lookups will be faster (we exploit locality in TCP segment
 					   arrivals). */
 					lwip.LWIP_ASSERT("tcp_input: pcb.next != pcb (before cache)", pcb.next != pcb);
-					if (prev != null)
-					{
+					if (prev != null) {
 						prev.next = pcb.next;
 						pcb.next = tcp_active_pcbs;
 						tcp_active_pcbs = pcb;
@@ -186,18 +169,15 @@ namespace uITron3
 				prev = pcb;
 			}
 
-			if (pcb == null)
-			{
+			if (pcb == null) {
 				/* If it did not go to an active connection, we check the connections
 				   in the TIME-WAIT state. */
-				for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-				{
+				for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 					lwip.LWIP_ASSERT("tcp_input: TIME-WAIT pcb.state == TIME-WAIT", pcb.state == tcp_state.TIME_WAIT);
 					if (pcb.remote_port == tcphdr.src &&
 						pcb.local_port == tcphdr.dest &&
 						ip_addr.ip_addr_cmp(pcb.remote_ip, lwip.current_iphdr_src) &&
-						ip_addr.ip_addr_cmp(pcb.local_ip, lwip.current_iphdr_dest))
-					{
+						ip_addr.ip_addr_cmp(pcb.local_ip, lwip.current_iphdr_dest)) {
 						/* We don't really care enough to move this PCB to the front
 						   of the list since we are not very likely to receive that
 						   many segments for connections in TIME-WAIT. */
@@ -211,18 +191,14 @@ namespace uITron3
 				/* Finally, if we still did not get a match, we check all PCBs that
 				   are tcp_state.LISTENing for incoming connections. */
 				tcp_pcb_listen lprev = null;
-				for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next)
-				{
-					if (lpcb.local_port == tcphdr.dest)
-					{
+				for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next) {
+					if (lpcb.local_port == tcphdr.dest) {
 #if SO_REUSE
-						if (ip_addr.ip_addr_cmp(lpcb.local_ip, lwip.current_iphdr_dest))
-						{
+						if (ip_addr.ip_addr_cmp(lpcb.local_ip, lwip.current_iphdr_dest)) {
 							/* found an exact match */
 							break;
 						}
-						else if (ip_addr.ip_addr_isany(lpcb.local_ip))
-						{
+						else if (ip_addr.ip_addr_isany(lpcb.local_ip)) {
 							/* found an ANY-match */
 							lpcb_any = lpcb;
 							lpcb_prev = lprev;
@@ -240,20 +216,17 @@ namespace uITron3
 				}
 #if SO_REUSE
 				/* first try specific local IP */
-				if (lpcb == null)
-				{
+				if (lpcb == null) {
 					/* only pass to ANY if no specific local IP has been found */
 					lpcb = lpcb_any;
 					lprev = lpcb_prev;
 				}
 #endif // SO_REUSE
-				if (lpcb != null)
-				{
+				if (lpcb != null) {
 					/* Move this PCB to the front of the list so that subsequent
 					   lookups will be faster (we exploit locality in TCP segment
 					   arrivals). */
-					if (lprev != null)
-					{
+					if (lprev != null) {
 						((tcp_pcb_listen)lprev).next = lpcb.next;
 						/* our successor is the remainder of the listening list */
 						lpcb.next = tcp_listen_pcbs.listen_pcbs;
@@ -275,8 +248,7 @@ namespace uITron3
 #endif // TCP_INPUT_DEBUG
 
 
-			if (pcb != null)
-			{
+			if (pcb != null) {
 				/* The incoming segment belongs to a connection. */
 #if TCP_INPUT_DEBUG
 #if TCP_DEBUG
@@ -293,17 +265,14 @@ namespace uITron3
 				recv_data = null;
 				recv_flags = 0;
 
-				if ((flags & tcp.TCP_PSH) != 0)
-				{
+				if ((flags & tcp.TCP_PSH) != 0) {
 					p.flags |= pbuf.PBUF_FLAG_PUSH;
 				}
 
 				/* If there is data which was previously "refused" by upper layer */
-				if (pcb.refused_data != null)
-				{
+				if (pcb.refused_data != null) {
 					if ((tcp_process_refused_data(pcb) == err_t.ERR_ABRT) ||
-					  ((pcb.refused_data != null) && (tcplen > 0)))
-					{
+					  ((pcb.refused_data != null) && (tcplen > 0))) {
 						/* pcb has been aborted or refused data is still refused and the new
 						   segment contains data */
 						++lwip.lwip_stats.tcp.drop;
@@ -315,10 +284,8 @@ namespace uITron3
 				err = tcp_process(pcb);
 				/* A return value of err_t.ERR_ABRT means that tcp.tcp_abort() was called
 				   and that the pcb has been freed. If so, we don't do anything. */
-				if (err != err_t.ERR_ABRT)
-				{
-					if ((recv_flags & tcp.TF_RESET) != 0)
-					{
+				if (err != err_t.ERR_ABRT) {
+					if ((recv_flags & tcp.TF_RESET) != 0) {
 						/* TF_RESET means that the connection was reset by the other
 						   end. We then call the error callback to inform the
 						   application that the connection is dead before we
@@ -327,12 +294,10 @@ namespace uITron3
 						tcp_pcb_remove(tcp_active_pcbs, pcb);
 						lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
 					}
-					else if ((recv_flags & tcp.TF_CLOSED) != 0)
-					{
+					else if ((recv_flags & tcp.TF_CLOSED) != 0) {
 						/* The connection has been closed and we will deallocate the
 						   PCB. */
-						if ((pcb.flags & tcp_pcb.TF_RXCLOSED) == 0)
-						{
+						if ((pcb.flags & tcp_pcb.TF_RXCLOSED) == 0) {
 							/* Connection closed although the application has only shut down the
 							   tx side: call the PCB's err callback and indicate the closure to
 							   ensure the application doesn't continue using the PCB. */
@@ -341,26 +306,21 @@ namespace uITron3
 						tcp_pcb_remove(tcp_active_pcbs, pcb);
 						lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
 					}
-					else
-					{
+					else {
 						err = err_t.ERR_OK;
 						/* If the application has registered a "sent" function to be
 						   called when new send buffer space is available, we call it
 						   now. */
-						if (pcb.acked > 0)
-						{
+						if (pcb.acked > 0) {
 							TCP_EVENT_SENT(pcb, pcb.acked, out err);
-							if (err == err_t.ERR_ABRT)
-							{
+							if (err == err_t.ERR_ABRT) {
 								goto aborted;
 							}
 						}
 
-						if (recv_data != null)
-						{
+						if (recv_data != null) {
 							lwip.LWIP_ASSERT("pcb.refused_data == null", pcb.refused_data == null);
-							if ((pcb.flags & tcp_pcb.TF_RXCLOSED) != 0)
-							{
+							if ((pcb.flags & tcp_pcb.TF_RXCLOSED) != 0) {
 								/* received data although already closed . abort (send RST) to
 								   notify the remote host that not all data has been processed */
 								lwip.pbuf_free(recv_data);
@@ -370,14 +330,12 @@ namespace uITron3
 
 							/* Notify application that data has been received. */
 							TCP_EVENT_RECV(pcb, recv_data, err_t.ERR_OK, out err);
-							if (err == err_t.ERR_ABRT)
-							{
+							if (err == err_t.ERR_ABRT) {
 								goto aborted;
 							}
 
 							/* If the upper layer can't receive this data, store it */
-							if (err != err_t.ERR_OK)
-							{
+							if (err != err_t.ERR_OK) {
 								pcb.refused_data = recv_data;
 								lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: keep incoming packet, because pcb is \"full\"\n");
 							}
@@ -385,24 +343,19 @@ namespace uITron3
 
 						/* If a FIN segment was received, we call the callback
 						   function with a null buffer to indicate EOF. */
-						if ((recv_flags & TF_GOT_FIN) != 0)
-						{
-							if (pcb.refused_data != null)
-							{
+						if ((recv_flags & TF_GOT_FIN) != 0) {
+							if (pcb.refused_data != null) {
 								/* Delay this if we have refused data. */
 								pcb.refused_data.flags |= pbuf.PBUF_FLAG_TCP_FIN;
 							}
-							else
-							{
+							else {
 								/* correct rcv_wnd as the application won't call tcp_recved()
 								   for the FIN's seqno */
-								if (pcb.rcv_wnd != opt.TCP_WND)
-								{
+								if (pcb.rcv_wnd != opt.TCP_WND) {
 									pcb.rcv_wnd++;
 								}
 								TCP_EVENT_CLOSED(pcb, out err);
-								if (err == err_t.ERR_ABRT)
-								{
+								if (err == err_t.ERR_ABRT) {
 									goto aborted;
 								}
 							}
@@ -425,20 +378,17 @@ namespace uITron3
 				recv_data = null;
 
 				/* give up our reference to inseg.p */
-				if (inseg.p != null)
-				{
+				if (inseg.p != null) {
 					lwip.pbuf_free(inseg.p);
 					inseg.p = null;
 				}
 			}
-			else
-			{
+			else {
 
 				/* If no matching PCB was found, send a TCP RST (reset) to the
 				   sender. */
 				lwip.LWIP_DEBUGF(opt.TCP_RST_DEBUG, "tcp_input: no PCB match found, resetting.\n");
-				if ((tcp_hdr.TCPH_FLAGS(tcphdr) & tcp.TCP_RST) == 0)
-				{
+				if ((tcp_hdr.TCPH_FLAGS(tcphdr) & tcp.TCP_RST) == 0) {
 					++lwip.lwip_stats.tcp.proterr;
 					++lwip.lwip_stats.tcp.drop;
 					tcp_rst(ackno, seqno + tcplen,
@@ -474,28 +424,24 @@ namespace uITron3
 			tcp_pcb npcb;
 			err_t rc;
 
-			if ((flags & tcp.TCP_RST) != 0)
-			{
+			if ((flags & tcp.TCP_RST) != 0) {
 				/* An incoming RST should be ignored. Return. */
 				return err_t.ERR_OK;
 			}
 
 			/* In the tcp_state.LISTEN state, we check for incoming SYN segments,
 			   creates a new PCB, and responds with a SYN|ACK. */
-			if ((flags & tcp.TCP_ACK) != 0)
-			{
+			if ((flags & tcp.TCP_ACK) != 0) {
 				/* For incoming segments with the ACK flag set, respond with a
 				   RST. */
 				lwip.LWIP_DEBUGF(opt.TCP_RST_DEBUG, "tcp_listen_input: ACK in tcp_state.LISTEN, sending reset\n");
 				tcp_rst(ackno, seqno + tcplen, lwip.ip_current_dest_addr(),
 				  lwip.ip_current_src_addr(), tcphdr.dest, tcphdr.src);
 			}
-			else if ((flags & tcp.TCP_SYN) != 0)
-			{
+			else if ((flags & tcp.TCP_SYN) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection request {0} . {1}.\n", tcphdr.src, tcphdr.dest);
 #if TCP_LISTEN_BACKLOG
-				if (pcb.accepts_pending >= pcb.backlog)
-				{
+				if (pcb.accepts_pending >= pcb.backlog) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_listen_input: listen backlog exceeded for port {0}\n", tcphdr.dest);
 					return err_t.ERR_ABRT;
 				}
@@ -504,8 +450,7 @@ namespace uITron3
 				/* If a new PCB could not be created (probably due to lack of memory),
 				   we don't do anything, but rely on the sender will retransmit the
 				   SYN at a time when we have more memory available. */
-				if (npcb == null)
-				{
+				if (npcb == null) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_listen_input: could not allocate PCB\n");
 					++lwip.lwip_stats.tcp.memerr;
 					return err_t.ERR_MEM;
@@ -545,8 +490,7 @@ namespace uITron3
 
 				/* Send a SYN|ACK together with the MSS option. */
 				rc = tcp_enqueue_flags(npcb, tcp.TCP_SYN | tcp.TCP_ACK);
-				if (rc != err_t.ERR_OK)
-				{
+				if (rc != err_t.ERR_OK) {
 					tcp_abandon(npcb, 0);
 					return rc;
 				}
@@ -571,32 +515,27 @@ namespace uITron3
 			 * - first check sequence number - we skip that one in tcp_state.TIME_WAIT (always
 			 *   acceptable since we only send ACKs)
 			 * - second check the RST bit (... return) */
-			if ((flags & tcp.TCP_RST) != 0)
-			{
+			if ((flags & tcp.TCP_RST) != 0) {
 				return err_t.ERR_OK;
 			}
 			/* - fourth, check the SYN bit, */
-			if ((flags & tcp.TCP_SYN) != 0)
-			{
+			if ((flags & tcp.TCP_SYN) != 0) {
 				/* If an incoming segment is not acceptable, an acknowledgment
 				   should be sent in reply */
-				if (tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt, pcb.rcv_nxt + pcb.rcv_wnd))
-				{
+				if (tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt, pcb.rcv_nxt + pcb.rcv_wnd)) {
 					/* If the SYN is in the window it is an error, send a reset */
 					tcp_rst(ackno, seqno + tcplen, lwip.ip_current_dest_addr(), lwip.ip_current_src_addr(),
 						tcphdr.dest, tcphdr.src);
 					return err_t.ERR_OK;
 				}
 			}
-			else if ((flags & tcp.TCP_FIN) != 0)
-			{
+			else if ((flags & tcp.TCP_FIN) != 0) {
 				/* - eighth, check the FIN bit: Remain in the TIME-WAIT state.
 					 Restart the 2 MSL time-wait timeout.*/
 				pcb.tmr = tcp_ticks;
 			}
 
-			if ((tcplen > 0))
-			{
+			if ((tcplen > 0)) {
 				/* Acknowledge data, FIN or out-of-window SYN */
 				pcb.flags |= tcp_pcb.TF_ACK_NOW;
 				return tcp_output(pcb);
@@ -624,35 +563,28 @@ namespace uITron3
 			err = err_t.ERR_OK;
 
 			/* Process incoming RST segments. */
-			if ((flags & tcp.TCP_RST) != 0)
-			{
+			if ((flags & tcp.TCP_RST) != 0) {
 				/* First, determine if the reset is acceptable. */
-				if (pcb.state == tcp_state.SYN_SENT)
-				{
-					if (ackno == pcb.snd_nxt)
-					{
+				if (pcb.state == tcp_state.SYN_SENT) {
+					if (ackno == pcb.snd_nxt) {
 						acceptable = 1;
 					}
 				}
-				else
-				{
+				else {
 					if (tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt,
-										pcb.rcv_nxt + pcb.rcv_wnd))
-					{
+										pcb.rcv_nxt + pcb.rcv_wnd)) {
 						acceptable = 1;
 					}
 				}
 
-				if (acceptable != 0)
-				{
+				if (acceptable != 0) {
 					lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_process: Connection RESET\n");
 					lwip.LWIP_ASSERT("tcp_input: pcb.state != tcp_state.CLOSED", pcb.state != tcp_state.CLOSED);
 					recv_flags |= tcp.TF_RESET;
 					pcb.flags &= unchecked((byte)~tcp_pcb.TF_ACK_DELAY);
 					return err_t.ERR_RST;
 				}
-				else
-				{
+				else {
 					lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_process: unacceptable reset seqno {0} rcv_nxt {1}\n",
 					 seqno, pcb.rcv_nxt);
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_process: unacceptable reset seqno {0} rcv_nxt {1}\n",
@@ -661,15 +593,13 @@ namespace uITron3
 				}
 			}
 
-			if ((flags & tcp.TCP_SYN) != 0 && (pcb.state != tcp_state.SYN_SENT && pcb.state != tcp_state.SYN_RCVD))
-			{
+			if ((flags & tcp.TCP_SYN) != 0 && (pcb.state != tcp_state.SYN_SENT && pcb.state != tcp_state.SYN_RCVD)) {
 				/* Cope with new connection attempt after remote end crashed */
 				tcp.tcp_ack_now(pcb);
 				return err_t.ERR_OK;
 			}
 
-			if ((pcb.flags & tcp_pcb.TF_RXCLOSED) == 0)
-			{
+			if ((pcb.flags & tcp_pcb.TF_RXCLOSED) == 0) {
 				/* Update the PCB (in)activity timer unless rx is closed (see tcp_shutdown) */
 				pcb.tmr = tcp_ticks;
 			}
@@ -678,199 +608,172 @@ namespace uITron3
 			tcp_parseopt(pcb);
 
 			/* Do different things depending on the TCP state. */
-			switch (pcb.state)
-			{
-				case tcp_state.SYN_SENT:
-					lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "SYN-SENT: ackno {0} pcb.snd_nxt {1} unacked {2}\n", ackno,
-					 pcb.snd_nxt, lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno));
-					/* received SYN ACK with expected sequence number? */
-					if ((flags & tcp.TCP_ACK) != 0 && (flags & tcp.TCP_SYN) != 0
-						&& ackno == lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno) + 1)
-					{
-						pcb.snd_buf++;
-						pcb.rcv_nxt = seqno + 1;
-						pcb.rcv_ann_right_edge = pcb.rcv_nxt;
-						pcb.lastack = ackno;
-						pcb.snd_wnd = tcphdr.wnd;
-						pcb.snd_wnd_max = tcphdr.wnd;
-						pcb.snd_wl1 = seqno - 1; /* initialise to seqno - 1 to force window update */
-						pcb.state = tcp_state.ESTABLISHED;
+			switch (pcb.state) {
+			case tcp_state.SYN_SENT:
+				lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "SYN-SENT: ackno {0} pcb.snd_nxt {1} unacked {2}\n", ackno,
+				 pcb.snd_nxt, lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno));
+				/* received SYN ACK with expected sequence number? */
+				if ((flags & tcp.TCP_ACK) != 0 && (flags & tcp.TCP_SYN) != 0
+					&& ackno == lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno) + 1) {
+					pcb.snd_buf++;
+					pcb.rcv_nxt = seqno + 1;
+					pcb.rcv_ann_right_edge = pcb.rcv_nxt;
+					pcb.lastack = ackno;
+					pcb.snd_wnd = tcphdr.wnd;
+					pcb.snd_wnd_max = tcphdr.wnd;
+					pcb.snd_wl1 = seqno - 1; /* initialise to seqno - 1 to force window update */
+					pcb.state = tcp_state.ESTABLISHED;
 
 #if TCP_CALCULATE_EFF_SEND_MSS
-						pcb.mss = tcp_eff_send_mss(pcb.mss, pcb.remote_ip);
+					pcb.mss = tcp_eff_send_mss(pcb.mss, pcb.remote_ip);
 #endif // TCP_CALCULATE_EFF_SEND_MSS
 
-						/* Set ssthresh again after changing pcb.mss (already set in tcp_connect
-						 * but for the default value of pcb.mss) */
-						pcb.ssthresh = (ushort)(pcb.mss * 10);
+					/* Set ssthresh again after changing pcb.mss (already set in tcp_connect
+					 * but for the default value of pcb.mss) */
+					pcb.ssthresh = (ushort)(pcb.mss * 10);
 
-						pcb.cwnd = (ushort)((pcb.cwnd == 1) ? (pcb.mss * 2) : pcb.mss);
-						lwip.LWIP_ASSERT("pcb.snd_queuelen > 0", (pcb.snd_queuelen > 0));
-						--pcb.snd_queuelen;
-						lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_process: SYN-SENT --queuelen {0}\n", (ushort)pcb.snd_queuelen);
-						rseg = pcb.unacked;
-						pcb.unacked = rseg.next;
-						tcp_seg_free(rseg);
+					pcb.cwnd = (ushort)((pcb.cwnd == 1) ? (pcb.mss * 2) : pcb.mss);
+					lwip.LWIP_ASSERT("pcb.snd_queuelen > 0", (pcb.snd_queuelen > 0));
+					--pcb.snd_queuelen;
+					lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_process: SYN-SENT --queuelen {0}\n", (ushort)pcb.snd_queuelen);
+					rseg = pcb.unacked;
+					pcb.unacked = rseg.next;
+					tcp_seg_free(rseg);
 
-						/* If there's nothing left to acknowledge, stop the retransmit
-						   timer, otherwise reset it to start again */
-						if (pcb.unacked == null)
-							pcb.rtime = -1;
-						else
-						{
-							pcb.rtime = 0;
-							pcb.nrtx = 0;
-						}
+					/* If there's nothing left to acknowledge, stop the retransmit
+					   timer, otherwise reset it to start again */
+					if (pcb.unacked == null)
+						pcb.rtime = -1;
+					else {
+						pcb.rtime = 0;
+						pcb.nrtx = 0;
+					}
 
-						/* Call the user specified function to call when sucessfully
-						 * connected. */
-						TCP_EVENT_CONNECTED(pcb, err_t.ERR_OK, out err);
-						if (err == err_t.ERR_ABRT)
-						{
+					/* Call the user specified function to call when sucessfully
+					 * connected. */
+					TCP_EVENT_CONNECTED(pcb, err_t.ERR_OK, out err);
+					if (err == err_t.ERR_ABRT) {
+						return err_t.ERR_ABRT;
+					}
+					tcp.tcp_ack_now(pcb);
+				}
+				/* received ACK? possibly a half-open connection */
+				else if ((flags & tcp.TCP_ACK) != 0) {
+					/* send a RST to bring the other side in a non-synchronized state. */
+					tcp_rst(ackno, seqno + tcplen, lwip.ip_current_dest_addr(), lwip.ip_current_src_addr(),
+						tcphdr.dest, tcphdr.src);
+				}
+				break;
+			case tcp_state.SYN_RCVD:
+				if ((flags & tcp.TCP_ACK) != 0) {
+					/* expected ACK number? */
+					if (tcp.TCP_SEQ_BETWEEN(ackno, pcb.lastack + 1, pcb.snd_nxt)) {
+						ushort old_cwnd;
+						pcb.state = tcp_state.ESTABLISHED;
+						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection established {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
+#if LWIP_CALLBACK_API
+						lwip.LWIP_ASSERT("pcb.accept != null", pcb.accept != null);
+#endif
+						/* Call the accept function. */
+						TCP_EVENT_ACCEPT(pcb, err_t.ERR_OK, out err);
+						if (err != err_t.ERR_OK) {
+							/* If the accept function returns with an error, we abort
+							 * the connection. */
+							/* Already aborted? */
+							if (err != err_t.ERR_ABRT) {
+								tcp_abort(pcb);
+							}
 							return err_t.ERR_ABRT;
 						}
-						tcp.tcp_ack_now(pcb);
+						old_cwnd = pcb.cwnd;
+						/* If there was any data contained within this ACK,
+						 * we'd better pass it on to the application as well. */
+						tcp_receive(pcb);
+
+						/* Prevent ACK for SYN to generate a sent event */
+						if (pcb.acked != 0) {
+							pcb.acked--;
+						}
+
+						pcb.cwnd = (ushort)((old_cwnd == 1) ? (pcb.mss * 2) : pcb.mss);
+
+						if ((recv_flags & tcp.TF_GOT_FIN) != 0) {
+							tcp.tcp_ack_now(pcb);
+							pcb.state = tcp_state.CLOSE_WAIT;
+						}
 					}
-					/* received ACK? possibly a half-open connection */
-					else if ((flags & tcp.TCP_ACK) != 0)
-					{
-						/* send a RST to bring the other side in a non-synchronized state. */
+					else {
+						/* incorrect ACK number, send RST */
 						tcp_rst(ackno, seqno + tcplen, lwip.ip_current_dest_addr(), lwip.ip_current_src_addr(),
 							tcphdr.dest, tcphdr.src);
 					}
-					break;
-				case tcp_state.SYN_RCVD:
-					if ((flags & tcp.TCP_ACK) != 0)
-					{
-						/* expected ACK number? */
-						if (tcp.TCP_SEQ_BETWEEN(ackno, pcb.lastack + 1, pcb.snd_nxt))
-						{
-							ushort old_cwnd;
-							pcb.state = tcp_state.ESTABLISHED;
-							lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection established {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
-#if LWIP_CALLBACK_API
-							lwip.LWIP_ASSERT("pcb.accept != null", pcb.accept != null);
-#endif
-							/* Call the accept function. */
-							TCP_EVENT_ACCEPT(pcb, err_t.ERR_OK, out err);
-							if (err != err_t.ERR_OK)
-							{
-								/* If the accept function returns with an error, we abort
-								 * the connection. */
-								/* Already aborted? */
-								if (err != err_t.ERR_ABRT)
-								{
-									tcp_abort(pcb);
-								}
-								return err_t.ERR_ABRT;
-							}
-							old_cwnd = pcb.cwnd;
-							/* If there was any data contained within this ACK,
-							 * we'd better pass it on to the application as well. */
-							tcp_receive(pcb);
-
-							/* Prevent ACK for SYN to generate a sent event */
-							if (pcb.acked != 0)
-							{
-								pcb.acked--;
-							}
-
-							pcb.cwnd = (ushort)((old_cwnd == 1) ? (pcb.mss * 2) : pcb.mss);
-
-							if ((recv_flags & tcp.TF_GOT_FIN) != 0)
-							{
-								tcp.tcp_ack_now(pcb);
-								pcb.state = tcp_state.CLOSE_WAIT;
-							}
-						}
-						else
-						{
-							/* incorrect ACK number, send RST */
-							tcp_rst(ackno, seqno + tcplen, lwip.ip_current_dest_addr(), lwip.ip_current_src_addr(),
-								tcphdr.dest, tcphdr.src);
-						}
-					}
-					else if ((flags & tcp.TCP_SYN) != 0 && (seqno == pcb.rcv_nxt - 1))
-					{
-						/* Looks like another copy of the SYN - retransmit our SYN-ACK */
-						tcp.tcp_rexmit(pcb);
-					}
-					break;
-				case tcp_state.CLOSE_WAIT:
-				/* FALLTHROUGH */
-				case tcp_state.ESTABLISHED:
-					tcp_receive(pcb);
-					if ((recv_flags & tcp.TF_GOT_FIN) != 0)
-					{ /* passive close */
-						tcp.tcp_ack_now(pcb);
-						pcb.state = tcp_state.CLOSE_WAIT;
-					}
-					break;
-				case tcp_state.FIN_WAIT_1:
-					tcp_receive(pcb);
-					if ((recv_flags & tcp.TF_GOT_FIN) != 0)
-					{
-						if ((flags & tcp.TCP_ACK) != 0 && (ackno == pcb.snd_nxt))
-						{
-							lwip.LWIP_DEBUGF(opt.TCP_DEBUG,
-							  "TCP connection closed: tcp_state.FIN_WAIT_1 {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
-							tcp.tcp_ack_now(pcb);
-							tcp_pcb_purge(pcb);
-							TCP_RMV_ACTIVE(pcb);
-							pcb.state = tcp_state.TIME_WAIT;
-							tcp_pcb_common temp = tcp_tw_pcbs;
-							TCP_REG(ref temp, pcb);
-							tcp_tw_pcbs = (tcp_pcb)temp;
-						}
-						else
-						{
-							tcp.tcp_ack_now(pcb);
-							pcb.state = tcp_state.CLOSING;
-						}
-					}
-					else if ((flags & tcp.TCP_ACK) != 0 && (ackno == pcb.snd_nxt))
-					{
-						pcb.state = tcp_state.FIN_WAIT_2;
-					}
-					break;
-				case tcp_state.FIN_WAIT_2:
-					tcp_receive(pcb);
-					if ((recv_flags & tcp.TF_GOT_FIN) != 0)
-					{
-						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.FIN_WAIT_2 {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
+				}
+				else if ((flags & tcp.TCP_SYN) != 0 && (seqno == pcb.rcv_nxt - 1)) {
+					/* Looks like another copy of the SYN - retransmit our SYN-ACK */
+					tcp.tcp_rexmit(pcb);
+				}
+				break;
+			case tcp_state.CLOSE_WAIT:
+			/* FALLTHROUGH */
+			case tcp_state.ESTABLISHED:
+				tcp_receive(pcb);
+				if ((recv_flags & tcp.TF_GOT_FIN) != 0) { /* passive close */
+					tcp.tcp_ack_now(pcb);
+					pcb.state = tcp_state.CLOSE_WAIT;
+				}
+				break;
+			case tcp_state.FIN_WAIT_1:
+				tcp_receive(pcb);
+				if ((recv_flags & tcp.TF_GOT_FIN) != 0) {
+					if ((flags & tcp.TCP_ACK) != 0 && (ackno == pcb.snd_nxt)) {
+						lwip.LWIP_DEBUGF(opt.TCP_DEBUG,
+						  "TCP connection closed: tcp_state.FIN_WAIT_1 {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
 						tcp.tcp_ack_now(pcb);
 						tcp_pcb_purge(pcb);
 						TCP_RMV_ACTIVE(pcb);
 						pcb.state = tcp_state.TIME_WAIT;
-						tcp_pcb_common temp = tcp_tw_pcbs;
-						TCP_REG(ref temp, pcb);
-						tcp_tw_pcbs = (tcp_pcb)temp;
+						TCP_REG(ref tcp_tw_pcbs, pcb);
 					}
-					break;
-				case tcp_state.CLOSING:
-					tcp_receive(pcb);
-					if ((flags & tcp.TCP_ACK) != 0 && ackno == pcb.snd_nxt)
-					{
-						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.CLOSING {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
-						tcp_pcb_purge(pcb);
-						TCP_RMV_ACTIVE(pcb);
-						pcb.state = tcp_state.TIME_WAIT;
-						tcp_pcb_common temp = tcp_tw_pcbs;
-						TCP_REG(ref temp, pcb);
-						tcp_tw_pcbs = (tcp_pcb)temp;
+					else {
+						tcp.tcp_ack_now(pcb);
+						pcb.state = tcp_state.CLOSING;
 					}
-					break;
-				case tcp_state.LAST_ACK:
-					tcp_receive(pcb);
-					if ((flags & tcp.TCP_ACK) != 0 && ackno == pcb.snd_nxt)
-					{
-						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.LAST_ACK {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
-						/* bugfix #21699: don't set pcb.state to tcp_state.CLOSED here or we risk leaking segments */
-						recv_flags |= tcp.TF_CLOSED;
-					}
-					break;
-				default:
-					break;
+				}
+				else if ((flags & tcp.TCP_ACK) != 0 && (ackno == pcb.snd_nxt)) {
+					pcb.state = tcp_state.FIN_WAIT_2;
+				}
+				break;
+			case tcp_state.FIN_WAIT_2:
+				tcp_receive(pcb);
+				if ((recv_flags & tcp.TF_GOT_FIN) != 0) {
+					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.FIN_WAIT_2 {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
+					tcp.tcp_ack_now(pcb);
+					tcp_pcb_purge(pcb);
+					TCP_RMV_ACTIVE(pcb);
+					pcb.state = tcp_state.TIME_WAIT;
+					TCP_REG(ref tcp_tw_pcbs, pcb);
+				}
+				break;
+			case tcp_state.CLOSING:
+				tcp_receive(pcb);
+				if ((flags & tcp.TCP_ACK) != 0 && ackno == pcb.snd_nxt) {
+					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.CLOSING {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
+					tcp_pcb_purge(pcb);
+					TCP_RMV_ACTIVE(pcb);
+					pcb.state = tcp_state.TIME_WAIT;
+					TCP_REG(ref tcp_tw_pcbs, pcb);
+				}
+				break;
+			case tcp_state.LAST_ACK:
+				tcp_receive(pcb);
+				if ((flags & tcp.TCP_ACK) != 0 && ackno == pcb.snd_nxt) {
+					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP connection closed: tcp_state.LAST_ACK {0} . {1}.\n", inseg.tcphdr.src, inseg.tcphdr.dest);
+					/* bugfix #21699: don't set pcb.state to tcp_state.CLOSED here or we risk leaking segments */
+					recv_flags |= tcp.TF_CLOSED;
+				}
+				break;
+			default:
+				break;
 			}
 			return err_t.ERR_OK;
 		}
@@ -885,23 +788,19 @@ namespace uITron3
 		{
 			tcp_seg old_seg;
 
-			if ((tcp_hdr.TCPH_FLAGS(cseg.tcphdr) & tcp.TCP_FIN) != 0)
-			{
+			if ((tcp_hdr.TCPH_FLAGS(cseg.tcphdr) & tcp.TCP_FIN) != 0) {
 				/* received segment overlaps all following segments */
 				tcp_segs_free(next);
 				next = null;
 			}
-			else
-			{
+			else {
 				/* delete some following segments
 				   oos queue may have segments with FIN flag */
 				while ((next != null) &&
 					TCP_SEQ_GEQ((seqno + cseg.len),
-								  (next.tcphdr.seqno + next.len)))
-				{
+								  (next.tcphdr.seqno + next.len))) {
 					/* cseg with FIN already processed */
-					if ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0)
-					{
+					if ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0) {
 						tcp_hdr.TCPH_SET_FLAG(cseg.tcphdr, tcp.TCP_FIN);
 					}
 					old_seg = next;
@@ -909,8 +808,7 @@ namespace uITron3
 					tcp_seg_free(old_seg);
 				}
 				if ((next != null) &&
-					TCP_SEQ_GT(seqno + cseg.len, next.tcphdr.seqno))
-				{
+					TCP_SEQ_GT(seqno + cseg.len, next.tcphdr.seqno)) {
 					/* We need to trim the incoming segment. */
 					cseg.len = (ushort)(next.tcphdr.seqno - seqno);
 					lwip.pbuf_realloc(cseg.p, cseg.len);
@@ -951,45 +849,37 @@ namespace uITron3
 
 			lwip.LWIP_ASSERT("tcp_receive: wrong state", pcb.state >= tcp_state.ESTABLISHED);
 
-			if ((flags & tcp.TCP_ACK) != 0)
-			{
+			if ((flags & tcp.TCP_ACK) != 0) {
 				right_wnd_edge = pcb.snd_wnd + pcb.snd_wl2;
 
 				/* Update window. */
 				if (tcp.TCP_SEQ_LT(pcb.snd_wl1, seqno) ||
 					(pcb.snd_wl1 == seqno && tcp.TCP_SEQ_LT(pcb.snd_wl2, ackno)) ||
-					(pcb.snd_wl2 == ackno && tcphdr.wnd > pcb.snd_wnd))
-				{
+					(pcb.snd_wl2 == ackno && tcphdr.wnd > pcb.snd_wnd)) {
 					pcb.snd_wnd = tcphdr.wnd;
 					/* keep track of the biggest window announced by the remote host to calculate
 					   the maximum segment size */
-					if (pcb.snd_wnd_max < tcphdr.wnd)
-					{
+					if (pcb.snd_wnd_max < tcphdr.wnd) {
 						pcb.snd_wnd_max = tcphdr.wnd;
 					}
 					pcb.snd_wl1 = seqno;
 					pcb.snd_wl2 = ackno;
-					if (pcb.snd_wnd == 0)
-					{
-						if (pcb.persist_backoff == 0)
-						{
+					if (pcb.snd_wnd == 0) {
+						if (pcb.persist_backoff == 0) {
 							/* start persist timer */
 							pcb.persist_cnt = 0;
 							pcb.persist_backoff = 1;
 						}
 					}
-					else if (pcb.persist_backoff > 0)
-					{
+					else if (pcb.persist_backoff > 0) {
 						/* stop persist timer */
 						pcb.persist_backoff = 0;
 					}
 					lwip.LWIP_DEBUGF(opt.TCP_WND_DEBUG, "tcp_receive: window update {0}\n", pcb.snd_wnd);
 #if TCP_WND_DEBUG
 				}
-				else
-				{
-					if (pcb.snd_wnd != tcphdr.wnd)
-					{
+				else {
+					if (pcb.snd_wnd != tcphdr.wnd) {
 						lwip.LWIP_DEBUGF(opt.TCP_WND_DEBUG,
 									"tcp_receive: no window update lastack {0} ackno {1} wl1 {2} seqno {3} wl2 {4}\n",
 									 pcb.lastack, ackno, pcb.snd_wl1, seqno, pcb.snd_wl2);
@@ -1018,37 +908,28 @@ namespace uITron3
 				 */
 
 				/* Clause 1 */
-				if (tcp.TCP_SEQ_LEQ(ackno, pcb.lastack))
-				{
+				if (tcp.TCP_SEQ_LEQ(ackno, pcb.lastack)) {
 					pcb.acked = 0;
 					/* Clause 2 */
-					if (tcplen == 0)
-					{
+					if (tcplen == 0) {
 						/* Clause 3 */
-						if (pcb.snd_wl2 + pcb.snd_wnd == right_wnd_edge)
-						{
+						if (pcb.snd_wl2 + pcb.snd_wnd == right_wnd_edge) {
 							/* Clause 4 */
-							if (pcb.rtime >= 0)
-							{
+							if (pcb.rtime >= 0) {
 								/* Clause 5 */
-								if (pcb.lastack == ackno)
-								{
+								if (pcb.lastack == ackno) {
 									found_dupack = 1;
-									if ((byte)(pcb.dupacks + 1) > pcb.dupacks)
-									{
+									if ((byte)(pcb.dupacks + 1) > pcb.dupacks) {
 										++pcb.dupacks;
 									}
-									if (pcb.dupacks > 3)
-									{
+									if (pcb.dupacks > 3) {
 										/* Inflate the congestion window, but not if it means that
 										   the value overflows. */
-										if ((ushort)(pcb.cwnd + pcb.mss) > pcb.cwnd)
-										{
+										if ((ushort)(pcb.cwnd + pcb.mss) > pcb.cwnd) {
 											pcb.cwnd += pcb.mss;
 										}
 									}
-									else if (pcb.dupacks == 3)
-									{
+									else if (pcb.dupacks == 3) {
 										/* Do fast retransmit */
 										tcp.tcp_rexmit_fast(pcb);
 									}
@@ -1058,20 +939,17 @@ namespace uITron3
 					}
 					/* If Clause (1) or more is true, but not a duplicate ack, reset
 					 * count of consecutive duplicate acks */
-					if (found_dupack == 0)
-					{
+					if (found_dupack == 0) {
 						pcb.dupacks = 0;
 					}
 				}
-				else if (tcp.TCP_SEQ_BETWEEN(ackno, pcb.lastack + 1, pcb.snd_nxt))
-				{
+				else if (tcp.TCP_SEQ_BETWEEN(ackno, pcb.lastack + 1, pcb.snd_nxt)) {
 					/* We come here when the ACK acknowledges new data. */
 
 					/* Reset the "IN Fast Retransmit" flag, since we are no longer
 					   in fast retransmit. Also reset the congestion window to the
 					   slow start threshold. */
-					if ((pcb.flags & tcp_pcb.TF_INFR) != 0)
-					{
+					if ((pcb.flags & tcp_pcb.TF_INFR) != 0) {
 						pcb.flags &= unchecked((byte)~tcp_pcb.TF_INFR);
 						pcb.cwnd = pcb.ssthresh;
 					}
@@ -1093,21 +971,16 @@ namespace uITron3
 
 					/* Update the congestion control variables (cwnd and
 					   ssthresh). */
-					if (pcb.state >= tcp_state.ESTABLISHED)
-					{
-						if (pcb.cwnd < pcb.ssthresh)
-						{
-							if ((ushort)(pcb.cwnd + pcb.mss) > pcb.cwnd)
-							{
+					if (pcb.state >= tcp_state.ESTABLISHED) {
+						if (pcb.cwnd < pcb.ssthresh) {
+							if ((ushort)(pcb.cwnd + pcb.mss) > pcb.cwnd) {
 								pcb.cwnd += pcb.mss;
 							}
 							lwip.LWIP_DEBUGF(opt.TCP_CWND_DEBUG, "tcp_receive: slow start cwnd {0}\n", pcb.cwnd);
 						}
-						else
-						{
+						else {
 							ushort new_cwnd = (ushort)(pcb.cwnd + pcb.mss * pcb.mss / pcb.cwnd);
-							if (new_cwnd > pcb.cwnd)
-							{
+							if (new_cwnd > pcb.cwnd) {
 								pcb.cwnd = new_cwnd;
 							}
 							lwip.LWIP_DEBUGF(opt.TCP_CWND_DEBUG, "tcp_receive: congestion avoidance cwnd {0}\n", pcb.cwnd);
@@ -1124,8 +997,7 @@ namespace uITron3
 					   ACK acknowlegdes them. */
 					while (pcb.unacked != null &&
 						   tcp.TCP_SEQ_LEQ(lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno) +
-									   (uint)tcp_hdr.TCP_TCPLEN(pcb.unacked), ackno))
-					{
+									   (uint)tcp_hdr.TCP_TCPLEN(pcb.unacked), ackno)) {
 						lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_receive: removing {0}:{1} from pcb.unacked\n",
 													  lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno),
 													  lwip.lwip_ntohl(pcb.unacked.tcphdr.seqno) +
@@ -1137,8 +1009,7 @@ namespace uITron3
 						lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_receive: queuelen {0} ... ", (ushort)pcb.snd_queuelen);
 						lwip.LWIP_ASSERT("pcb.snd_queuelen >= pbuf_clen(next.p)", (pcb.snd_queuelen >= lwip.pbuf_clen(next.p)));
 						/* Prevent ACK for FIN to generate a sent event */
-						if ((pcb.acked != 0) && ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0))
-						{
+						if ((pcb.acked != 0) && ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0)) {
 							pcb.acked--;
 						}
 
@@ -1146,8 +1017,7 @@ namespace uITron3
 						tcp_seg_free(next);
 
 						lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "{0} (after freeing unacked)\n", (ushort)pcb.snd_queuelen);
-						if (pcb.snd_queuelen != 0)
-						{
+						if (pcb.snd_queuelen != 0) {
 							lwip.LWIP_ASSERT("tcp_receive: valid queue length", pcb.unacked != null ||
 										pcb.unsent != null);
 						}
@@ -1162,8 +1032,7 @@ namespace uITron3
 
 					pcb.polltmr = 0;
 				}
-				else
-				{
+				else {
 					/* Fix bug bug #21582: out of sequence ACK, didn't really ack anything */
 					pcb.acked = 0;
 				}
@@ -1176,8 +1045,7 @@ namespace uITron3
 				   in fact have been sent once. */
 				while (pcb.unsent != null &&
 					   tcp.TCP_SEQ_BETWEEN(ackno, lwip.lwip_ntohl(pcb.unsent.tcphdr.seqno) +
-									   (uint)tcp_hdr.TCP_TCPLEN(pcb.unsent), pcb.snd_nxt))
-				{
+									   (uint)tcp_hdr.TCP_TCPLEN(pcb.unsent), pcb.snd_nxt)) {
 					lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_receive: removing %{0}:{1} from pcb.unsent\n",
 												  lwip.lwip_ntohl(pcb.unsent.tcphdr.seqno), lwip.lwip_ntohl(pcb.unsent.tcphdr.seqno) +
 												  tcp_hdr.TCP_TCPLEN(pcb.unsent));
@@ -1185,23 +1053,20 @@ namespace uITron3
 					next = pcb.unsent;
 					pcb.unsent = pcb.unsent.next;
 #if TCP_OVERSIZE
-					if (pcb.unsent == null)
-					{
+					if (pcb.unsent == null) {
 						pcb.unsent_oversize = 0;
 					}
 #endif // TCP_OVERSIZE
 					lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_receive: queuelen {0} ... ", (ushort)pcb.snd_queuelen);
 					lwip.LWIP_ASSERT("pcb.snd_queuelen >= pbuf_clen(next.p)", (pcb.snd_queuelen >= lwip.pbuf_clen(next.p)));
 					/* Prevent ACK for FIN to generate a sent event */
-					if ((pcb.acked != 0) && ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0))
-					{
+					if ((pcb.acked != 0) && ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0)) {
 						pcb.acked--;
 					}
 					pcb.snd_queuelen -= lwip.pbuf_clen(next.p);
 					tcp_seg_free(next);
 					lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "{0} (after freeing unsent)\n", (ushort)pcb.snd_queuelen);
-					if (pcb.snd_queuelen != 0)
-					{
+					if (pcb.snd_queuelen != 0) {
 						lwip.LWIP_ASSERT("tcp_receive: valid queue length",
 						  pcb.unacked != null || pcb.unsent != null);
 					}
@@ -1214,8 +1079,7 @@ namespace uITron3
 				/* RTT estimation calculations. This is done by checking if the
 				   incoming segment acknowledges the segment we use to take a
 				   round-trip time measurement. */
-				if (pcb.rttest != 0 && tcp.TCP_SEQ_LT(pcb.rtseq, ackno))
-				{
+				if (pcb.rttest != 0 && tcp.TCP_SEQ_LT(pcb.rtseq, ackno)) {
 					/* diff between this shouldn't exceed 32K since this are tcp timer ticks
 					   and a round-trip shouldn't be that long... */
 					m = (short)(tcp_ticks - pcb.rttest);
@@ -1226,8 +1090,7 @@ namespace uITron3
 					/* This is taken directly from VJs original code in his paper */
 					m = (short)(m - (pcb.sa >> 3));
 					pcb.sa += m;
-					if (m < 0)
-					{
+					if (m < 0) {
 						m = (short)-m;
 					}
 					m = (short)(m - (pcb.sv >> 2));
@@ -1245,8 +1108,7 @@ namespace uITron3
 			   further unless the pcb already received a FIN.
 			   (RFC 793, chapeter 3.9, "SEGMENT ARRIVES" in states CLOSE-WAIT, tcp_state.CLOSING,
 			   LAST-ACK and TIME-WAIT: "Ignore the segment text.") */
-			if ((tcplen > 0) && (pcb.state < tcp_state.CLOSE_WAIT))
-			{
+			if ((tcplen > 0) && (pcb.state < tcp_state.CLOSE_WAIT)) {
 				/* This code basically does three things:
 
 				+) If the incoming segment contains data that is the next
@@ -1277,8 +1139,7 @@ namespace uITron3
 				   segment is larger than rcv_nxt. */
 				/*    if (tcp.TCP_SEQ_LT(seqno, pcb.rcv_nxt)){
 					  if (tcp.TCP_SEQ_LT(pcb.rcv_nxt, seqno + tcplen)) {*/
-				if (tcp.TCP_SEQ_BETWEEN(pcb.rcv_nxt, seqno + 1, seqno + tcplen - 1))
-				{
+				if (tcp.TCP_SEQ_BETWEEN(pcb.rcv_nxt, seqno + 1, seqno + tcplen - 1)) {
 					/* Trimming the first edge is done by pushing the payload
 					   pointer in the pbuf downwards. This is somewhat tricky since
 					   we do not want to discard the full contents of the pbuf up to
@@ -1303,12 +1164,10 @@ namespace uITron3
 					p = inseg.p;
 					lwip.LWIP_ASSERT("inseg.p != null", inseg.p != null);
 					lwip.LWIP_ASSERT("insane offset!", (off < 0x7fff));
-					if (inseg.p.len < off)
-					{
+					if (inseg.p.len < off) {
 						lwip.LWIP_ASSERT("pbuf too short!", (((int)inseg.p.tot_len) >= off));
 						new_tot_len = (ushort)(inseg.p.tot_len - off);
-						while (p.len < off)
-						{
+						while (p.len < off) {
 							off -= p.len;
 							/* KJM following line changed (with addition of new_tot_len var)
 							   to fix bug #9076
@@ -1317,16 +1176,13 @@ namespace uITron3
 							p.len = 0;
 							p = p.next;
 						}
-						if (lwip.pbuf_header(p, (short)-off) != 0)
-						{
+						if (lwip.pbuf_header(p, (short)-off) != 0) {
 							/* Do we need to cope with this failing?  Assert for now */
 							lwip.LWIP_ASSERT("pbuf_header failed", false);
 						}
 					}
-					else
-					{
-						if (lwip.pbuf_header(inseg.p, (short)-off) != 0)
-						{
+					else {
+						if (lwip.pbuf_header(inseg.p, (short)-off) != 0) {
 							/* Do we need to cope with this failing?  Assert for now */
 							lwip.LWIP_ASSERT("pbuf_header failed", false);
 						}
@@ -1334,10 +1190,8 @@ namespace uITron3
 					inseg.len -= (ushort)(pcb.rcv_nxt - seqno);
 					inseg.tcphdr.seqno = seqno = pcb.rcv_nxt;
 				}
-				else
-				{
-					if (tcp.TCP_SEQ_LT(seqno, pcb.rcv_nxt))
-					{
+				else {
+					if (tcp.TCP_SEQ_LT(seqno, pcb.rcv_nxt)) {
 						/* the whole segment is < rcv_nxt */
 						/* must be a duplicate of a packet that has already been correctly handled */
 
@@ -1350,31 +1204,26 @@ namespace uITron3
 				   and below rcv_nxt + rcv_wnd) in order to be further
 				   processed. */
 				if (tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt,
-									pcb.rcv_nxt + pcb.rcv_wnd - 1))
-				{
-					if (pcb.rcv_nxt == seqno)
-					{
+									pcb.rcv_nxt + pcb.rcv_wnd - 1)) {
+					if (pcb.rcv_nxt == seqno) {
 						/* The incoming segment is the next in sequence. We check if
 						   we have to trim the end of the segment and update rcv_nxt
 						   and pass the data to the application. */
 						tcplen = (ushort)tcp_hdr.TCP_TCPLEN(inseg);
 
-						if (tcplen > pcb.rcv_wnd)
-						{
+						if (tcplen > pcb.rcv_wnd) {
 							lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG,
 										"tcp_receive: other end overran receive window"
 										 + "seqno {0} len {1} right edge {2}\n",
 										 seqno, tcplen, pcb.rcv_nxt + pcb.rcv_wnd);
-							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0)
-							{
+							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0) {
 								/* Must remove the FIN from the header as we're trimming 
 								 * that byte of sequence-space from the packet */
 								tcp_hdr.TCPH_FLAGS_SET(inseg.tcphdr, (ushort)(tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & ~tcp.TCP_FIN));
 							}
 							/* Adjust length of segment to fit in the window. */
 							inseg.len = pcb.rcv_wnd;
-							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) != 0)
-							{
+							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) != 0) {
 								inseg.len -= 1;
 							}
 							lwip.pbuf_realloc(inseg.p, inseg.len);
@@ -1386,34 +1235,28 @@ namespace uITron3
 						/* Received in-sequence data, adjust ooseq data if:
 						   - FIN has been received or
 						   - inseq overlaps with ooseq */
-						if (pcb.ooseq != null)
-						{
-							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0)
-							{
+						if (pcb.ooseq != null) {
+							if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0) {
 								lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG,
 											("tcp_receive: received in-order FIN, binning ooseq queue\n"));
 								/* Received in-order FIN means anything that was received
 								 * out of order must now have been received in-order, so
 								 * bin the ooseq queue */
-								while (pcb.ooseq != null)
-								{
+								while (pcb.ooseq != null) {
 									tcp_seg old_ooseq = pcb.ooseq;
 									pcb.ooseq = pcb.ooseq.next;
 									tcp_seg_free(old_ooseq);
 								}
 							}
-							else
-							{
+							else {
 								next = pcb.ooseq;
 								/* Remove all segments on ooseq that are covered by inseg already.
 								 * FIN is copied from ooseq to inseg if present. */
 								while ((next != null) &&
-									TCP_SEQ_GEQ(seqno + tcplen, next.tcphdr.seqno + next.len))
-								{
+									TCP_SEQ_GEQ(seqno + tcplen, next.tcphdr.seqno + next.len)) {
 									/* inseg cannot have FIN here (already processed above) */
 									if ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0 &&
-										(tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) == 0)
-									{
+										(tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) == 0) {
 										tcp_hdr.TCPH_SET_FLAG(inseg.tcphdr, tcp.TCP_FIN);
 										tcplen = (ushort)tcp_hdr.TCP_TCPLEN(inseg);
 									}
@@ -1424,12 +1267,10 @@ namespace uITron3
 								/* Now trim right side of inseg if it overlaps with the first
 								 * segment on ooseq */
 								if ((next != null) &&
-									TCP_SEQ_GT(seqno + tcplen, next.tcphdr.seqno))
-								{
+									TCP_SEQ_GT(seqno + tcplen, next.tcphdr.seqno)) {
 									/* inseg cannot have FIN here (already processed above) */
 									inseg.len = (ushort)(next.tcphdr.seqno - seqno);
-									if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) != 0)
-									{
+									if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_SYN) != 0) {
 										inseg.len -= 1;
 									}
 									lwip.pbuf_realloc(inseg.p, inseg.len);
@@ -1459,16 +1300,14 @@ namespace uITron3
 						   If the segment was a FIN, we set the TF_GOT_FIN flag that will
 						   be used to indicate to the application that the remote side has
 						   closed its end of the connection. */
-						if (inseg.p.tot_len > 0)
-						{
+						if (inseg.p.tot_len > 0) {
 							recv_data = inseg.p;
 							/* Since this pbuf now is the responsibility of the
 							   application, we delete our reference to it so that we won't
 							   (mistakingly) deallocate it. */
 							inseg.p = null;
 						}
-						if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0)
-						{
+						if ((tcp_hdr.TCPH_FLAGS(inseg.tcphdr) & tcp.TCP_FIN) != 0) {
 							lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_receive: received FIN.\n");
 							recv_flags |= tcp.TF_GOT_FIN;
 						}
@@ -1477,8 +1316,7 @@ namespace uITron3
 						/* We now check if we have segments on the .ooseq queue that
 						   are now in sequence. */
 						while (pcb.ooseq != null &&
-							   pcb.ooseq.tcphdr.seqno == pcb.rcv_nxt)
-						{
+							   pcb.ooseq.tcphdr.seqno == pcb.rcv_nxt) {
 
 							cseg = pcb.ooseq;
 							seqno = pcb.ooseq.tcphdr.seqno;
@@ -1490,26 +1328,21 @@ namespace uITron3
 
 							tcp.tcp_update_rcv_ann_wnd(pcb);
 
-							if (cseg.p.tot_len > 0)
-							{
+							if (cseg.p.tot_len > 0) {
 								/* Chain this pbuf onto the pbuf that we will pass to
 								   the application. */
-								if (recv_data != null)
-								{
+								if (recv_data != null) {
 									lwip.pbuf_cat(recv_data, cseg.p);
 								}
-								else
-								{
+								else {
 									recv_data = cseg.p;
 								}
 								cseg.p = null;
 							}
-							if ((tcp_hdr.TCPH_FLAGS(cseg.tcphdr) & tcp.TCP_FIN) != 0)
-							{
+							if ((tcp_hdr.TCPH_FLAGS(cseg.tcphdr) & tcp.TCP_FIN) != 0) {
 								lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_receive: dequeued FIN.\n");
 								recv_flags |= tcp.TF_GOT_FIN;
-								if (pcb.state == tcp_state.ESTABLISHED)
-								{ /* force passive close or we can move to active close */
+								if (pcb.state == tcp_state.ESTABLISHED) { /* force passive close or we can move to active close */
 									pcb.state = tcp_state.CLOSE_WAIT;
 								}
 							}
@@ -1524,18 +1357,15 @@ namespace uITron3
 						tcp.tcp_ack(pcb);
 
 					}
-					else
-					{
+					else {
 						/* We get here if the incoming segment is out-of-sequence. */
 						tcp_send_empty_ack(pcb);
 #if TCP_QUEUE_OOSEQ
 						/* We queue the segment on the .ooseq queue. */
-						if (pcb.ooseq == null)
-						{
+						if (pcb.ooseq == null) {
 							pcb.ooseq = tcp_seg_copy(inseg);
 						}
-						else
-						{
+						else {
 							/* If the queue is not empty, we walk through the queue and
 							   try to find a place where the sequence number of the
 							   incoming segment is between the sequence numbers of the
@@ -1549,77 +1379,62 @@ namespace uITron3
 							   contains less data. */
 
 							prev = null;
-							for (next = pcb.ooseq; next != null; next = next.next)
-							{
-								if (seqno == next.tcphdr.seqno)
-								{
+							for (next = pcb.ooseq; next != null; next = next.next) {
+								if (seqno == next.tcphdr.seqno) {
 									/* The sequence number of the incoming segment is the
 									   same as the sequence number of the segment on
 									   .ooseq. We check the lengths to see which one to
 									   discard. */
-									if (inseg.len > next.len)
-									{
+									if (inseg.len > next.len) {
 										/* The incoming segment is larger than the old
 										   segment. We replace some segments with the new
 										   one. */
 										cseg = tcp_seg_copy(inseg);
-										if (cseg != null)
-										{
-											if (prev != null)
-											{
+										if (cseg != null) {
+											if (prev != null) {
 												prev.next = cseg;
 											}
-											else
-											{
+											else {
 												pcb.ooseq = cseg;
 											}
 											tcp_oos_insert_segment(cseg, next);
 										}
 										break;
 									}
-									else
-									{
+									else {
 										/* Either the lenghts are the same or the incoming
 										   segment was smaller than the old one; in either
 										   case, we ditch the incoming segment. */
 										break;
 									}
 								}
-								else
-								{
-									if (prev == null)
-									{
-										if (tcp.TCP_SEQ_LT(seqno, next.tcphdr.seqno))
-										{
+								else {
+									if (prev == null) {
+										if (tcp.TCP_SEQ_LT(seqno, next.tcphdr.seqno)) {
 											/* The sequence number of the incoming segment is lower
 											   than the sequence number of the first segment on the
 											   queue. We put the incoming segment first on the
 											   queue. */
 											cseg = tcp_seg_copy(inseg);
-											if (cseg != null)
-											{
+											if (cseg != null) {
 												pcb.ooseq = cseg;
 												tcp_oos_insert_segment(cseg, next);
 											}
 											break;
 										}
 									}
-									else
-									{
+									else {
 										/*if (tcp.TCP_SEQ_LT(prev.tcphdr.seqno, seqno) &&
 										  tcp.TCP_SEQ_LT(seqno, next.tcphdr.seqno)) {*/
-										if (tcp.TCP_SEQ_BETWEEN(seqno, prev.tcphdr.seqno + 1, next.tcphdr.seqno - 1))
-										{
+										if (tcp.TCP_SEQ_BETWEEN(seqno, prev.tcphdr.seqno + 1, next.tcphdr.seqno - 1)) {
 											/* The sequence number of the incoming segment is in
 											   between the sequence numbers of the previous and
 											   the next segment on .ooseq. We trim trim the previous
 											   segment, delete next segments that included in received segment
 											   and trim received, if needed. */
 											cseg = tcp_seg_copy(inseg);
-											if (cseg != null)
-											{
-												if (TCP_SEQ_GT(prev.tcphdr.seqno + prev.len, seqno))
-												{
+											if (cseg != null) {
+												if (TCP_SEQ_GT(prev.tcphdr.seqno + prev.len, seqno)) {
 													/* We need to trim the prev segment. */
 													prev.len = (ushort)(seqno - prev.tcphdr.seqno);
 													lwip.pbuf_realloc(prev.p, prev.len);
@@ -1634,31 +1449,25 @@ namespace uITron3
 									   ooseq queue, we add the incoming segment to the end
 									   of the list. */
 									if (next.next == null &&
-										TCP_SEQ_GT(seqno, next.tcphdr.seqno))
-									{
-										if ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0)
-										{
+										TCP_SEQ_GT(seqno, next.tcphdr.seqno)) {
+										if ((tcp_hdr.TCPH_FLAGS(next.tcphdr) & tcp.TCP_FIN) != 0) {
 											/* segment "next" already contains all data */
 											break;
 										}
 										next.next = tcp_seg_copy(inseg);
-										if (next.next != null)
-										{
-											if (TCP_SEQ_GT(next.tcphdr.seqno + next.len, seqno))
-											{
+										if (next.next != null) {
+											if (TCP_SEQ_GT(next.tcphdr.seqno + next.len, seqno)) {
 												/* We need to trim the last segment. */
 												next.len = (ushort)(seqno - next.tcphdr.seqno);
 												lwip.pbuf_realloc(next.p, next.len);
 											}
 											/* check if the remote side overruns our receive window */
-											if ((uint)tcplen + seqno > pcb.rcv_nxt + (uint)pcb.rcv_wnd)
-											{
+											if ((uint)tcplen + seqno > pcb.rcv_nxt + (uint)pcb.rcv_wnd) {
 												lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG,
 															"tcp_receive: other end overran receive window"
 															 + "seqno {0} len {1} right edge {2}\n",
 															 seqno, tcplen, pcb.rcv_nxt + pcb.rcv_wnd);
-												if ((tcp_hdr.TCPH_FLAGS(next.next.tcphdr) & tcp.TCP_FIN) != 0)
-												{
+												if ((tcp_hdr.TCPH_FLAGS(next.next.tcphdr) & tcp.TCP_FIN) != 0) {
 													/* Must remove the FIN from the header as we're trimming 
 													 * that byte of sequence-space from the packet */
 													tcp_hdr.TCPH_FLAGS_SET(next.next.tcphdr, (ushort)(tcp_hdr.TCPH_FLAGS(next.next.tcphdr) & ~tcp.TCP_FIN));
@@ -1683,23 +1492,19 @@ namespace uITron3
 						ooseq_blen = 0;
 						ooseq_qlen = 0;
 						prev = null;
-						for (next = pcb.ooseq; next != null; prev = next, next = next.next)
-						{
+						for (next = pcb.ooseq; next != null; prev = next, next = next.next) {
 							pbuf p1 = next.p;
 							ooseq_blen += p1.tot_len;
 							ooseq_qlen += lwip.pbuf_clen(p1);
 							if ((ooseq_blen > opt.TCP_OOSEQ_MAX_BYTES) ||
-								(ooseq_qlen > opt.TCP_OOSEQ_MAX_PBUFS))
-							{
+								(ooseq_qlen > opt.TCP_OOSEQ_MAX_PBUFS)) {
 								/* too much ooseq data, dump this and everything after it */
 								tcp_segs_free(next);
-								if (prev == null)
-								{
+								if (prev == null) {
 									/* first ooseq segment is too much, dump the whole queue */
 									pcb.ooseq = null;
 								}
-								else
-								{
+								else {
 									/* just dump 'next' and everything after it */
 									prev.next = null;
 								}
@@ -1710,20 +1515,17 @@ namespace uITron3
 #endif // TCP_QUEUE_OOSEQ
 					}
 				}
-				else
-				{
+				else {
 					/* The incoming segment is not withing the window. */
 					tcp_send_empty_ack(pcb);
 				}
 			}
-			else
-			{
+			else {
 				/* Segments with length 0 is taken care of here. Segments that
 				   fall out of the window are ACKed. */
 				/*if (TCP_SEQ_GT(pcb.rcv_nxt, seqno) ||
 				  TCP_SEQ_GEQ(seqno, pcb.rcv_nxt + pcb.rcv_wnd)) {*/
-				if (!tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt, pcb.rcv_nxt + pcb.rcv_wnd - 1))
-				{
+				if (!tcp.TCP_SEQ_BETWEEN(seqno, pcb.rcv_nxt, pcb.rcv_nxt + pcb.rcv_wnd - 1)) {
 					tcp.tcp_ack_now(pcb);
 				}
 			}
@@ -1750,76 +1552,68 @@ namespace uITron3
 			opts = tcphdr + tcp.TCP_HLEN;
 
 			/* Parse the TCP MSS option, if present. */
-			if (tcp_hdr.TCPH_HDRLEN(tcphdr) > 0x5)
-			{
+			if (tcp_hdr.TCPH_HDRLEN(tcphdr) > 0x5) {
 				max_c = (ushort)((tcp_hdr.TCPH_HDRLEN(tcphdr) - 5) << 2);
-				for (c = 0; c < max_c;)
-				{
+				for (c = 0; c < max_c;) {
 					opt = opts[c];
-					switch (opt)
-					{
-						case 0x00:
-							/* End of options. */
-							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: EOL\n");
+					switch (opt) {
+					case 0x00:
+						/* End of options. */
+						lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: EOL\n");
+						return;
+					case 0x01:
+						/* NOP option. */
+						++c;
+						lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: NOP\n");
+						break;
+					case 0x02:
+						lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: MSS\n");
+						if (opts[c + 1] != 0x04 || c + 0x04 > max_c) {
+							/* Bad length */
+							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
 							return;
-						case 0x01:
-							/* NOP option. */
-							++c;
-							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: NOP\n");
-							break;
-						case 0x02:
-							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: MSS\n");
-							if (opts[c + 1] != 0x04 || c + 0x04 > max_c)
-							{
-								/* Bad length */
-								lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
-								return;
-							}
-							/* An MSS option with the right option length. */
-							mss = (ushort)((opts[c + 2] << 8) | opts[c + 3]);
-							/* Limit the mss to the configured TCP_MSS and prevent division by zero */
-							pcb.mss = (ushort)(((mss > uITron3.opt.TCP_MSS) || (mss == 0)) ? uITron3.opt.TCP_MSS : mss);
-							/* Advance to next option */
-							c += 0x04;
-							break;
+						}
+						/* An MSS option with the right option length. */
+						mss = (ushort)((opts[c + 2] << 8) | opts[c + 3]);
+						/* Limit the mss to the configured TCP_MSS and prevent division by zero */
+						pcb.mss = (ushort)(((mss > uITron3.opt.TCP_MSS) || (mss == 0)) ? uITron3.opt.TCP_MSS : mss);
+						/* Advance to next option */
+						c += 0x04;
+						break;
 #if LWIP_TCP_TIMESTAMPS
-						case 0x08:
-							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: TS\n");
-							if (opts[c + 1] != 0x0A || c + 0x0A > max_c)
-							{
-								/* Bad length */
-								lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
-								return;
-							}
-							/* TCP timestamp option with valid length */
-							tsval = (uint)((opts[c + 2]) | (opts[c + 3] << 8) |
-								(opts[c + 4] << 16) | (opts[c + 5] << 24));
-							if ((flags & tcp.TCP_SYN) != 0)
-							{
-								pcb.ts_recent = lwip.lwip_ntohl(tsval);
-								pcb.flags |= tcp_pcb.TF_TIMESTAMP;
-							}
-							else if (tcp.TCP_SEQ_BETWEEN(pcb.ts_lastacksent, seqno, seqno + tcplen))
-							{
-								pcb.ts_recent = lwip.lwip_ntohl(tsval);
-							}
-							/* Advance to next option */
-							c += 0x0A;
-							break;
+					case 0x08:
+						lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: TS\n");
+						if (opts[c + 1] != 0x0A || c + 0x0A > max_c) {
+							/* Bad length */
+							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
+							return;
+						}
+						/* TCP timestamp option with valid length */
+						tsval = (uint)((opts[c + 2]) | (opts[c + 3] << 8) |
+							(opts[c + 4] << 16) | (opts[c + 5] << 24));
+						if ((flags & tcp.TCP_SYN) != 0) {
+							pcb.ts_recent = lwip.lwip_ntohl(tsval);
+							pcb.flags |= tcp_pcb.TF_TIMESTAMP;
+						}
+						else if (tcp.TCP_SEQ_BETWEEN(pcb.ts_lastacksent, seqno, seqno + tcplen)) {
+							pcb.ts_recent = lwip.lwip_ntohl(tsval);
+						}
+						/* Advance to next option */
+						c += 0x0A;
+						break;
 #endif
-						default:
-							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: other\n");
-							if (opts[c + 1] == 0)
-							{
-								lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
-								/* If the length field is zero, the options are malformed
-								   and we don't process them further. */
-								return;
-							}
-							/* All other options have a length field, so that we easily
-							   can skip past them. */
-							c += opts[c + 1];
-							break;
+					default:
+						lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: other\n");
+						if (opts[c + 1] == 0) {
+							lwip.LWIP_DEBUGF(uITron3.opt.TCP_INPUT_DEBUG, "tcp_parseopt: bad length\n");
+							/* If the length field is zero, the options are malformed
+							   and we don't process them further. */
+							return;
+						}
+						/* All other options have a length field, so that we easily
+						   can skip past them. */
+						c += opts[c + 1];
+						break;
 					}
 				}
 			}

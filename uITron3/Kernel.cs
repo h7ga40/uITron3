@@ -68,7 +68,7 @@ namespace uITron3
 
 		public bool IsTerminated() { return m_Terminate; }
 
-		public bool IsAlibe
+		public bool IsAlive
 		{
 			get { return (m_Thread != null) && m_Thread.IsAlive; }
 		}
@@ -88,6 +88,20 @@ namespace uITron3
 		public TKernelEvent OnIdle { get { return m_OnIdle; } set { m_OnIdle = value; } }
 		public TOutputEvent OnOutput { get { return m_OnOutput; } set { m_OnOutput = value; } }
 		public TGetSystemTimeEvent OnGetSystemTime { get { return m_OnGetSystemTimeEvent; } }
+
+		public PacketBridge IPPacketBridge
+		{
+			get { return m_Nucleus.IPPacketBridge; }
+			set { m_Nucleus.IPPacketBridge = value; }
+		}
+
+		public ip_addr IP4Addr { get { return m_Nucleus.IP4Addr; } }
+		public ip_addr SubNetMask { get { return m_Nucleus.SubNetMask; } }
+
+		public void SetIPv4Addr(uint addr, uint mask)
+		{
+			m_Nucleus.SetIPv4Addr(addr, mask);
+		}
 
 		ICPUContext IKernel.GetCurrent() { return /*m_Current*/CPUContext.GetCurrent(); }
 
@@ -386,21 +400,21 @@ namespace uITron3
 		{
 			ID tskid = ID.TSK_NULL;
 
-			TCallbackEvent callback = new TCallbackEvent();
+			//TCallbackEvent callback = new TCallbackEvent();
 
-			callback.Func = 2;
+			//callback.Func = 2;
 
-			if (!m_CallbackSem.WaitOne())
-				throw new Exception();
+			//if (!m_CallbackSem.WaitOne())
+			//	throw new Exception();
 
-			try {
-				m_EventQueue.AddLast(callback);
-			}
-			finally {
-				m_CallbackSem.Release();
-			}
+			//try {
+			//	m_EventQueue.AddLast(callback);
+			//}
+			//finally {
+			//	m_CallbackSem.Release();
+			//}
 
-			DoSetEvent();
+			//DoSetEvent();
 
 			return tskid;
 		}
@@ -446,7 +460,7 @@ namespace uITron3
 
 			m_IntEvent.Set();
 
-			m_Thread.Abort();
+			CPUContext.Exit();
 		}
 
 		public void LockCPU()
@@ -456,7 +470,7 @@ namespace uITron3
 			// 他のスレッドが動かないようロック
 			if (TlsLockCount == 0) {
 				Interlocked.Increment(ref m_Locked);
-				for (; ; ) {
+				for (;;) {
 					if (!m_SysSem.WaitOne()) {
 						Terminate();
 						break;
@@ -465,6 +479,10 @@ namespace uITron3
 					CPUContext Context = CPUContext.GetCurrent();
 					if ((Context == null) || (Context == m_Current) || (m_Current == null))
 						break;
+
+					if (!InKernelMode())
+						m_IntEvent.Set();
+
 					// 実行したくないスレッドはもう一度待つ
 					m_SysSem.Release();
 					Thread.Yield();

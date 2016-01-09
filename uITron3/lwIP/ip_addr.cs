@@ -70,6 +70,11 @@ namespace uITron3
 		{
 		}
 
+		public ip_addr(pointer buffer, int offset)
+			: base(buffer.data, buffer.offset + offset)
+		{
+		}
+
 		public uint addr
 		{
 			get { return BitConverter.ToUInt32(data, offset); }
@@ -79,8 +84,14 @@ namespace uITron3
 		/** IP_ADDR_ can be used as a fixed IP address
 		 *  for the wildcard and the broadcast address
 		 */
-		public static readonly ip_addr IP_ADDR_ANY = ip_addr_any;
-		public static readonly ip_addr IP_ADDR_BROADCAST = ip_addr_broadcast;
+		public static readonly ip_addr IP_ADDR_ANY;
+		public static readonly ip_addr IP_ADDR_BROADCAST;
+
+		static ip_addr()
+		{
+			IP_ADDR_ANY = ip_addr_any;
+			IP_ADDR_BROADCAST = ip_addr_broadcast;
+		}
 
 		/** 255.255.255.255 */
 		public const uint IPADDR_NONE = ((uint)0xffffffffUL);
@@ -237,33 +248,28 @@ namespace uITron3
 
 			/* all ones (broadcast) or all zeroes (old skool broadcast) */
 			if ((~addr == IPADDR_ANY) ||
-				(addr == IPADDR_ANY))
-			{
+				(addr == IPADDR_ANY)) {
 				return true;
 				/* no broadcast support on this network interface? */
 			}
-			else if ((netif.flags & lwip.NETIF_FLAG_BROADCAST) == 0)
-			{
+			else if ((netif.flags & lwip.NETIF_FLAG_BROADCAST) == 0) {
 				/* the given address cannot be a broadcast address
 				 * nor can we check against any broadcast addresses */
 				return false;
 				/* address matches network interface address exactly? => no broadcast */
 			}
-			else if (addr == ip_addr.ip4_addr_get_u32(netif.ip_addr))
-			{
+			else if (addr == ip_addr.ip4_addr_get_u32(netif.ip_addr)) {
 				return false;
 				/*  on the same (sub) network... */
 			}
 			else if (ip_addr.ip_addr_netcmp(ipaddr, netif.ip_addr, netif.netmask)
 				  /* ...and host identifier bits are all ones? =>... */
 				  && ((addr & ~ip_addr.ip4_addr_get_u32(netif.netmask)) ==
-				   (IPADDR_BROADCAST & ~ip_addr.ip4_addr_get_u32(netif.netmask))))
-			{
+				   (IPADDR_BROADCAST & ~ip_addr.ip4_addr_get_u32(netif.netmask)))) {
 				/* => network broadcast address */
 				return true;
 			}
-			else
-			{
+			else {
 				return false;
 			}
 		}
@@ -279,18 +285,14 @@ namespace uITron3
 			uint nm_hostorder = lwip.lwip_htonl(netmask);
 
 			/* first, check for the first zero */
-			for (mask = 1U << 31; mask != 0; mask >>= 1)
-			{
-				if ((nm_hostorder & mask) == 0)
-				{
+			for (mask = 1U << 31; mask != 0; mask >>= 1) {
+				if ((nm_hostorder & mask) == 0) {
 					break;
 				}
 			}
 			/* then check that there is no one */
-			for (; mask != 0; mask >>= 1)
-			{
-				if ((nm_hostorder & mask) != 0)
-				{
+			for (; mask != 0; mask >>= 1) {
+				if ((nm_hostorder & mask) != 0) {
 					/* there is a one after the first zero . invalid */
 					return false;
 				}
@@ -318,8 +320,7 @@ namespace uITron3
 		{
 			ip_addr val = new ip_addr(0);
 
-			if (ipaddr_aton(cp, val) != 0)
-			{
+			if (ipaddr_aton(cp, val) != 0) {
 				return ip_addr.ip4_addr_get_u32(val);
 			}
 			return (IPADDR_NONE);
@@ -347,8 +348,7 @@ namespace uITron3
 
 			cp += "\0";
 			c = cp[0];
-			for (;;)
-			{
+			for (;;) {
 				/*
 				 * Collect number up to ``.''.
 				 * Values are specified as for C:
@@ -358,42 +358,35 @@ namespace uITron3
 					return (0);
 				val = 0;
 				@base = 10;
-				if (c == '0')
-				{
+				if (c == '0') {
 					c = cp[++p];
-					if (c == 'x' || c == 'X')
-					{
+					if (c == 'x' || c == 'X') {
 						@base = 16;
 						c = cp[++p];
 					}
 					else
 						@base = 8;
 				}
-				for (;;)
-				{
-					if (isdigit(c))
-					{
+				for (;;) {
+					if (isdigit(c)) {
 						val = (val * @base) + (uint)(c - (byte)'0');
 						c = cp[++p];
 					}
-					else if (@base == 16 && isxdigit(c))
-					{
+					else if (@base == 16 && isxdigit(c)) {
 						val = (val << 4) | (uint)(c + 10 - (islower(c) ? (byte)'a' : (byte)'A'));
 						c = cp[++p];
 					}
 					else
 						break;
 				}
-				if (c == '.')
-				{
+				if (c == '.') {
 					/*
 					 * Internet format:
 					 *  a.b.c.d
 					 *  a.b.c   (with c treated as 16 bits)
 					 *  a.b (with b treated as 24 bits)
 					 */
-					if (pp >= 3)
-					{
+					if (pp >= 3) {
 						return (0);
 					}
 					parts[pp++] = val;
@@ -405,52 +398,46 @@ namespace uITron3
 			/*
 			 * Check for trailing characters.
 			 */
-			if (c != '\0' && !isspace(c))
-			{
+			if (c != '\0' && !isspace(c)) {
 				return (0);
 			}
 			/*
 			 * Concoct the address according to
 			 * the number of parts specified.
 			 */
-			switch (pp + 1)
-			{
+			switch (pp + 1) {
 
-				case 0:
-					return (0);       /* initial nondigit */
+			case 0:
+				return (0);       /* initial nondigit */
 
-				case 1:             /* a -- 32 bits */
-					break;
+			case 1:             /* a -- 32 bits */
+				break;
 
-				case 2:             /* a.b -- 8.24 bits */
-					if (val > 0xffffffUL)
-					{
-						return (0);
-					}
-					val |= parts[0] << 24;
-					break;
+			case 2:             /* a.b -- 8.24 bits */
+				if (val > 0xffffffUL) {
+					return (0);
+				}
+				val |= parts[0] << 24;
+				break;
 
-				case 3:             /* a.b.c -- 8.8.16 bits */
-					if (val > 0xffff)
-					{
-						return (0);
-					}
-					val |= (parts[0] << 24) | (parts[1] << 16);
-					break;
+			case 3:             /* a.b.c -- 8.8.16 bits */
+				if (val > 0xffff) {
+					return (0);
+				}
+				val |= (parts[0] << 24) | (parts[1] << 16);
+				break;
 
-				case 4:             /* a.b.c.d -- 8.8.8.8 bits */
-					if (val > 0xff)
-					{
-						return (0);
-					}
-					val |= (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8);
-					break;
-				default:
-					lwip.LWIP_ASSERT("unhandled", false);
-					break;
+			case 4:             /* a.b.c.d -- 8.8.8.8 bits */
+				if (val > 0xff) {
+					return (0);
+				}
+				val |= (parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8);
+				break;
+			default:
+				lwip.LWIP_ASSERT("unhandled", false);
+				break;
 			}
-			if (addr != null)
-			{
+			if (addr != null) {
 				ip_addr.ip4_addr_set_u32(addr, lwip.lwip_htonl(val));
 			}
 			return (1);
@@ -494,25 +481,20 @@ namespace uITron3
 
 			rp = 0;
 			ap = 0;
-			for (n = 0; n < 4; n++)
-			{
+			for (n = 0; n < 4; n++) {
 				i = 0;
-				do
-				{
+				do {
 					rem = (byte)(s_addr[ap] % 10);
 					s_addr[ap] /= (byte)10;
 					inv[i++] = (char)('0' + rem);
 				} while (s_addr[ap] != 0);
-				while ((i--) != 0)
-				{
-					if (len++ >= buf.Length)
-					{
+				while ((i--) != 0) {
+					if (len++ >= buf.Length) {
 						return null;
 					}
 					buf[rp++] = inv[i];
 				}
-				if (len++ >= buf.Length)
-				{
+				if (len++ >= buf.Length) {
 					return null;
 				}
 				buf[rp++] = '.';
@@ -530,5 +512,28 @@ namespace uITron3
 				ipaddr != null ? ip_addr.ip4_addr3_16(ipaddr) : 0,
 				ipaddr != null ? ip_addr.ip4_addr4_16(ipaddr) : 0);
 		}
+	}
+
+	public class ip6_addr : pointer
+	{
+		public struct Fields
+		{
+			public static readonly array_field_info<byte> addr = new array_field_info<byte>(0, 16);
+			public static readonly array_field_info<ushort> saddr = new array_field_info<ushort>(0, 8, true);
+		}
+		public new const int length = 16;
+
+		public ip6_addr(byte[] data, int offset) : base(data, offset) { }
+		public ip6_addr(pointer data, int offset) : base(data, offset) { }
+		public ip6_addr(pointer data) : base(data) { }
+
+		public ip6_addr(byte[] addr)
+			: base(new byte[length], 0)
+		{
+			pointer.memcpy(this.addr, new pointer(addr, 0), length);
+		}
+
+		public array<byte> addr { get { return GetArrayField(Fields.addr); } }
+		public array<ushort> saddr { get { return GetArrayField(Fields.saddr); } }
 	}
 }

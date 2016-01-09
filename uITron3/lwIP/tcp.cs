@@ -331,8 +331,7 @@ namespace uITron3
 #if TCP_LISTEN_BACKLOG
 		public static void tcp_accepted(tcp_pcb_common pcb)
 		{
-			do
-			{
+			do {
 				lwip.LWIP_ASSERT("pcb.state == tcp_state.LISTEN (called for wrong pcb?)", pcb.state == tcp_state.LISTEN);
 				((tcp_pcb_listen)(pcb)).accepts_pending--;
 			} while (false);
@@ -355,7 +354,6 @@ namespace uITron3
 		public const int TCP_PRIO_MAX = 127;
 	}
 
-
 	public partial class tcp
 	{
 		/* From http://www.iana.org/assignments/port-numbers:
@@ -373,17 +371,17 @@ namespace uITron3
 #endif // LWIP_TCP_KEEPALIVE
 
 		public static readonly string[] tcp_state_str = new string[]{
-			"tcp_state.CLOSED",
-			"tcp_state.LISTEN",
-			"tcp_state.SYN_SENT",
-			"tcp_state.SYN_RCVD",
-			"tcp_state.ESTABLISHED",
-			"tcp_state.FIN_WAIT_1",
-			"tcp_state.FIN_WAIT_2",
-			"tcp_state.CLOSE_WAIT",
-			"tcp_state.CLOSING",
-			"tcp_state.LAST_ACK",
-			"tcp_state.TIME_WAIT"
+			"CLOSED",
+			"LISTEN",
+			"SYN_SENT",
+			"SYN_RCVD",
+			"ESTABLISHED",
+			"FIN_WAIT_1",
+			"FIN_WAIT_2",
+			"CLOSE_WAIT",
+			"CLOSING",
+			"LAST_ACK",
+			"TIME_WAIT"
 		};
 
 		/* last local TCP port */
@@ -440,8 +438,7 @@ namespace uITron3
 			/* Call tcp_fasttmr() every 250 ms */
 			tcp_fasttmr();
 
-			if ((++tcp_timer & 1) != 0)
-			{
+			if ((++tcp_timer & 1) != 0) {
 				/* Call tcp_tmr() every 500 ms, i.e., every other timer
 				   tcp_tmr() is called. */
 				tcp_slowtmr();
@@ -468,11 +465,9 @@ namespace uITron3
 		{
 			err_t err;
 
-			if (rst_on_unacked_data != 0 && ((pcb.state == tcp_state.ESTABLISHED) || (pcb.state == tcp_state.CLOSE_WAIT)))
-			{
+			if (rst_on_unacked_data != 0 && ((pcb.state == tcp_state.ESTABLISHED) || (pcb.state == tcp_state.CLOSE_WAIT))) {
 				tcp_pcb _pcb = (tcp_pcb)pcb;
-				if ((_pcb.refused_data != null) || (_pcb.rcv_wnd != opt.TCP_WND))
-				{
+				if ((_pcb.refused_data != null) || (_pcb.rcv_wnd != opt.TCP_WND)) {
 					/* Not all data received by application, send RST to tell the remote
 					   side about this. */
 					lwip.LWIP_ASSERT("pcb.flags & tcp_pcb.TF_RXCLOSED", (_pcb.flags & tcp_pcb.TF_RXCLOSED) != 0);
@@ -484,16 +479,12 @@ namespace uITron3
 
 					tcp_pcb_purge(_pcb);
 					TCP_RMV_ACTIVE(_pcb);
-					if (_pcb.state == tcp_state.ESTABLISHED)
-					{
+					if (_pcb.state == tcp_state.ESTABLISHED) {
 						/* move to tcp_state.TIME_WAIT since we close actively */
 						_pcb.state = tcp_state.TIME_WAIT;
-						tcp_pcb_common temp = tcp_tw_pcbs;
-						TCP_REG(ref temp, _pcb);
-						tcp_tw_pcbs = (tcp_pcb)temp;
+						TCP_REG(ref tcp_tw_pcbs, _pcb);
 					}
-					else
-					{
+					else {
 						/* tcp_state.CLOSE_WAIT: deallocate the pcb since we already sent a RST for it */
 						lwip.memp_free(memp_t.MEMP_TCP_PCB, _pcb);
 					}
@@ -501,70 +492,64 @@ namespace uITron3
 				}
 			}
 
-			switch (pcb.state)
-			{
-				case tcp_state.CLOSED:
-					/* Closing a pcb in the tcp_state.CLOSED state might seem erroneous,
-					 * however, it is in this state once allocated and as yet unused
-					 * and the user needs some way to free it should the need arise.
-					 * Calling tcp_close() with a pcb that has already been closed, (i.e. twice)
-					 * or for a pcb that has been used and then entered the tcp_state.CLOSED state 
-					 * is erroneous, but this should never happen as the pcb has in those cases
-					 * been freed, and so any remaining handles are bogus. */
-					err = err_t.ERR_OK;
-					if (pcb.local_port != 0)
-					{
-						TCP_RMV(ref tcp_bound_pcbs, pcb);
-					}
-					lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
-					pcb = null;
-					break;
-				case tcp_state.LISTEN:
-					err = err_t.ERR_OK;
-					tcp_pcb_remove(tcp_listen_pcbs.pcbs, pcb);
-					lwip.memp_free(memp_t.MEMP_TCP_PCB_LISTEN, pcb);
-					pcb = null;
-					break;
-				case tcp_state.SYN_SENT:
-					err = err_t.ERR_OK;
-					TCP_PCB_REMOVE_ACTIVE(pcb);
-					lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
-					pcb = null;
+			switch (pcb.state) {
+			case tcp_state.CLOSED:
+				/* Closing a pcb in the tcp_state.CLOSED state might seem erroneous,
+				 * however, it is in this state once allocated and as yet unused
+				 * and the user needs some way to free it should the need arise.
+				 * Calling tcp_close() with a pcb that has already been closed, (i.e. twice)
+				 * or for a pcb that has been used and then entered the tcp_state.CLOSED state 
+				 * is erroneous, but this should never happen as the pcb has in those cases
+				 * been freed, and so any remaining handles are bogus. */
+				err = err_t.ERR_OK;
+				if (pcb.local_port != 0) {
+					TCP_RMV(ref tcp_bound_pcbs, pcb);
+				}
+				lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
+				pcb = null;
+				break;
+			case tcp_state.LISTEN:
+				err = err_t.ERR_OK;
+				tcp_pcb_remove(tcp_listen_pcbs.pcbs, pcb);
+				lwip.memp_free(memp_t.MEMP_TCP_PCB_LISTEN, pcb);
+				pcb = null;
+				break;
+			case tcp_state.SYN_SENT:
+				err = err_t.ERR_OK;
+				TCP_PCB_REMOVE_ACTIVE(pcb);
+				lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
+				pcb = null;
+				//snmp.snmp_inc_tcpattemptfails();
+				break;
+			case tcp_state.SYN_RCVD:
+				err = tcp_send_fin((tcp_pcb)pcb);
+				if (err == err_t.ERR_OK) {
 					//snmp.snmp_inc_tcpattemptfails();
-					break;
-				case tcp_state.SYN_RCVD:
-					err = tcp_send_fin((tcp_pcb)pcb);
-					if (err == err_t.ERR_OK)
-					{
-						//snmp.snmp_inc_tcpattemptfails();
-						pcb.state = tcp_state.FIN_WAIT_1;
-					}
-					break;
-				case tcp_state.ESTABLISHED:
-					err = tcp_send_fin((tcp_pcb)pcb);
-					if (err == err_t.ERR_OK)
-					{
-						//snmp.snmp_inc_tcpestabresets();
-						pcb.state = tcp_state.FIN_WAIT_1;
-					}
-					break;
-				case tcp_state.CLOSE_WAIT:
-					err = tcp_send_fin((tcp_pcb)pcb);
-					if (err == err_t.ERR_OK)
-					{
-						//snmp.snmp_inc_tcpestabresets();
-						pcb.state = tcp_state.LAST_ACK;
-					}
-					break;
-				default:
-					/* Has already been closed, do nothing. */
-					err = err_t.ERR_OK;
-					pcb = null;
-					break;
+					pcb.state = tcp_state.FIN_WAIT_1;
+				}
+				break;
+			case tcp_state.ESTABLISHED:
+				err = tcp_send_fin((tcp_pcb)pcb);
+				if (err == err_t.ERR_OK) {
+					//snmp.snmp_inc_tcpestabresets();
+					pcb.state = tcp_state.FIN_WAIT_1;
+				}
+				break;
+			case tcp_state.CLOSE_WAIT:
+				err = tcp_send_fin((tcp_pcb)pcb);
+				if (err == err_t.ERR_OK) {
+					//snmp.snmp_inc_tcpestabresets();
+					pcb.state = tcp_state.LAST_ACK;
+				}
+				break;
+			default:
+				/* Has already been closed, do nothing. */
+				err = err_t.ERR_OK;
+				pcb = null;
+				break;
 			}
 
-			if (pcb != null && err == err_t.ERR_OK)
-			{
+			if (pcb != null && err == err_t.ERR_OK) {
 				/* To ensure all data has been sent when tcp_close returns, we have
 				   to make sure tcp.tcp_output doesn't fail.
 				   Since we don't really have to ensure all data has been sent when tcp_close
@@ -599,8 +584,7 @@ namespace uITron3
 			tcp_debug_print_state(pcb.state);
 #endif // TCP_DEBUG
 
-			if (pcb.state != tcp_state.LISTEN)
-			{
+			if (pcb.state != tcp_state.LISTEN) {
 				/* Set a flag not to receive any more data... */
 				((tcp_pcb)pcb).flags |= tcp_pcb.TF_RXCLOSED;
 			}
@@ -622,40 +606,34 @@ namespace uITron3
 		 */
 		public err_t tcp_shutdown(tcp_pcb pcb, int shut_rx, int shut_tx)
 		{
-			if (pcb.state == tcp_state.LISTEN)
-			{
+			if (pcb.state == tcp_state.LISTEN) {
 				return err_t.ERR_CONN;
 			}
-			if (shut_rx != 0)
-			{
+			if (shut_rx != 0) {
 				/* shut down the receive side: set a flag not to receive any more data... */
 				pcb.flags |= tcp_pcb.TF_RXCLOSED;
-				if (shut_tx != 0)
-				{
+				if (shut_tx != 0) {
 					/* shutting down the tx AND rx side is the same as closing for the raw API */
 					return tcp_close_shutdown(pcb, 1);
 				}
 				/* ... and free buffered data */
-				if (pcb.refused_data != null)
-				{
+				if (pcb.refused_data != null) {
 					lwip.pbuf_free(pcb.refused_data);
 					pcb.refused_data = null;
 				}
 			}
-			if (shut_tx != 0)
-			{
+			if (shut_tx != 0) {
 				/* This can't happen twice since if it succeeds, the pcb's state is changed.
 				   Only close in these states as the others directly deallocate the PCB */
-				switch (pcb.state)
-				{
-					case tcp_state.SYN_RCVD:
-					case tcp_state.ESTABLISHED:
-					case tcp_state.CLOSE_WAIT:
-						return tcp_close_shutdown(pcb, (byte)shut_rx);
-					default:
-						/* Not (yet?) connected, cannot shutdown the TX side as that would bring us
-						  into tcp_state.CLOSED state, where the PCB is deallocated. */
-						return err_t.ERR_CONN;
+				switch (pcb.state) {
+				case tcp_state.SYN_RCVD:
+				case tcp_state.ESTABLISHED:
+				case tcp_state.CLOSE_WAIT:
+					return tcp_close_shutdown(pcb, (byte)shut_rx);
+				default:
+					/* Not (yet?) connected, cannot shutdown the TX side as that would bring us
+					  into tcp_state.CLOSED state, where the PCB is deallocated. */
+					return err_t.ERR_CONN;
 				}
 			}
 			return err_t.ERR_OK;
@@ -683,13 +661,11 @@ namespace uITron3
 			/* Figure out on which TCP PCB list we are, and remove us. If we
 			   are in an active state, call the receive function associated with
 			   the PCB with a null argument, and send an RST to the remote end. */
-			if (pcb.state == tcp_state.TIME_WAIT)
-			{
+			if (pcb.state == tcp_state.TIME_WAIT) {
 				tcp_pcb_remove(tcp_tw_pcbs, pcb);
 				lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
 			}
-			else
-			{
+			else {
 				seqno = pcb.snd_nxt;
 				ackno = pcb.rcv_nxt;
 #if LWIP_CALLBACK_API
@@ -697,22 +673,18 @@ namespace uITron3
 #endif // LWIP_CALLBACK_API
 				errf_arg = pcb.callback_arg;
 				TCP_PCB_REMOVE_ACTIVE(pcb);
-				if (pcb.unacked != null)
-				{
+				if (pcb.unacked != null) {
 					tcp_segs_free(pcb.unacked);
 				}
-				if (pcb.unsent != null)
-				{
+				if (pcb.unsent != null) {
 					tcp_segs_free(pcb.unsent);
 				}
 #if TCP_QUEUE_OOSEQ
-				if (pcb.ooseq != null)
-				{
+				if (pcb.ooseq != null) {
 					tcp_segs_free(pcb.ooseq);
 				}
 #endif // TCP_QUEUE_OOSEQ
-				if (reset != 0)
-				{
+				if (reset != 0) {
 					lwip.LWIP_DEBUGF(opt.TCP_RST_DEBUG, "tcp_abandon: sending RST\n");
 					tcp_rst(seqno, ackno, pcb.local_ip, pcb.remote_ip, pcb.local_port, pcb.remote_port);
 				}
@@ -764,28 +736,22 @@ namespace uITron3
 			   We do not dump tcp_state.TIME_WAIT pcb's; they can still be matched by incoming
 			   packets using both local and remote IP addresses and ports to distinguish.
 			 */
-			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
-			{
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR)) {
 				max_pcb_list = NUM_TCP_PCB_LISTS_NO_TIME_WAIT;
 			}
 #endif // SO_REUSE
 
-			if (port == 0)
-			{
+			if (port == 0) {
 				port = tcp_new_port();
-				if (port == 0)
-				{
+				if (port == 0) {
 					return err_t.ERR_BUF;
 				}
 			}
 
 			/* Check if the address already is in use (on all lists) */
-			for (i = 0; i < max_pcb_list; i++)
-			{
-				for (cpcb = tcp_pcb_lists[i]; cpcb != null; cpcb = cpcb.next)
-				{
-					if (cpcb.local_port == port)
-					{
+			for (i = 0; i < max_pcb_list; i++) {
+				for (cpcb = tcp_pcb_lists[i]; cpcb != null; cpcb = cpcb.next) {
+					if (cpcb.local_port == port) {
 #if SO_REUSE
 						/* Omit checking for the same port if both pcbs have REUSEADDR set.
 						   For SO_REUSEADDR, the duplicate-check for a 5-tuple is done in
@@ -796,8 +762,7 @@ namespace uITron3
 						{
 							if (ip_addr.ip_addr_isany(cpcb.local_ip) ||
 								ip_addr.ip_addr_isany(ipaddr) ||
-								ip_addr.ip_addr_cmp(cpcb.local_ip, ipaddr))
-							{
+								ip_addr.ip_addr_cmp(cpcb.local_ip, ipaddr)) {
 								return err_t.ERR_USE;
 							}
 						}
@@ -805,8 +770,7 @@ namespace uITron3
 				}
 			}
 
-			if (!ip_addr.ip_addr_isany(ipaddr))
-			{
+			if (!ip_addr.ip_addr_isany(ipaddr)) {
 				ip_addr.ip_addr_copy(pcb.local_ip, ipaddr);
 			}
 			pcb.local_port = port;
@@ -850,22 +814,17 @@ namespace uITron3
 			if (lwip.LWIP_ERROR("tcp_listen: pcb already connected", pcb.state == tcp_state.CLOSED)) return null;
 
 			/* already listening? */
-			if (pcb.state == tcp_state.LISTEN)
-			{
+			if (pcb.state == tcp_state.LISTEN) {
 				return (tcp_pcb_listen)pcb;
 			}
 #if SO_REUSE
-			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
-			{
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR)) {
 				/* Since sof.SOF_REUSEADDR allows reusing a local address before the pcb's usage
 				   is declared (listen-/connection-pcb), we have to make sure now that
 				   this port is only used once for every local IP. */
-				for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next)
-				{
-					if (lpcb.local_port == pcb.local_port)
-					{
-						if (ip_addr.ip_addr_cmp(lpcb.local_ip, pcb.local_ip))
-						{
+				for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next) {
+					if (lpcb.local_port == pcb.local_port) {
+						if (ip_addr.ip_addr_cmp(lpcb.local_ip, pcb.local_ip)) {
 							/* this address/port is already used */
 							return null;
 						}
@@ -874,8 +833,7 @@ namespace uITron3
 			}
 #endif // SO_REUSE
 			lpcb = (tcp_pcb_listen)lwip.memp_malloc(memp_t.MEMP_TCP_PCB_LISTEN);
-			if (lpcb == null)
-			{
+			if (lpcb == null) {
 				return null;
 			}
 			lpcb.callback_arg = pcb.callback_arg;
@@ -887,8 +845,7 @@ namespace uITron3
 			lpcb.ttl = pcb.ttl;
 			lpcb.tos = pcb.tos;
 			ip_addr.ip_addr_copy(lpcb.local_ip, pcb.local_ip);
-			if (pcb.local_port != 0)
-			{
+			if (pcb.local_port != 0) {
 				TCP_RMV(ref tcp_bound_pcbs, pcb);
 			}
 			lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb);
@@ -899,9 +856,7 @@ namespace uITron3
 			lpcb.accepts_pending = 0;
 			lpcb.backlog = (backlog != 0) ? backlog : (byte)1;
 #endif // TCP_LISTEN_BACKLOG
-			tcp_pcb_common temp = tcp_listen_pcbs.pcbs;
-			TCP_REG(ref temp, lpcb);
-			tcp_listen_pcbs.pcbs = temp;
+			TCP_REG(ref tcp_listen_pcbs.pcbs, lpcb);
 			return lpcb;
 		}
 
@@ -915,22 +870,18 @@ namespace uITron3
 		{
 			uint new_right_edge = pcb.rcv_nxt + pcb.rcv_wnd;
 
-			if (tcp.TCP_SEQ_GEQ(new_right_edge, pcb.rcv_ann_right_edge + Math.Min((uint)(opt.TCP_WND / 2), (uint)pcb.mss)))
-			{
+			if (tcp.TCP_SEQ_GEQ(new_right_edge, pcb.rcv_ann_right_edge + Math.Min((uint)(opt.TCP_WND / 2), (uint)pcb.mss))) {
 				/* we can advertise more window */
 				pcb.rcv_ann_wnd = pcb.rcv_wnd;
 				return new_right_edge - pcb.rcv_ann_right_edge;
 			}
-			else
-			{
-				if (tcp.TCP_SEQ_GT(pcb.rcv_nxt, pcb.rcv_ann_right_edge))
-				{
+			else {
+				if (tcp.TCP_SEQ_GT(pcb.rcv_nxt, pcb.rcv_ann_right_edge)) {
 					/* Can happen due to other end sending out of advertised window,
 					 * but within actual available (but not yet advertised) window */
 					pcb.rcv_ann_wnd = 0;
 				}
-				else
-				{
+				else {
 					/* keep the right edge of window constant */
 					uint new_rcv_ann_wnd = pcb.rcv_ann_right_edge - pcb.rcv_nxt;
 					lwip.LWIP_ASSERT("new_rcv_ann_wnd <= 0xffff", new_rcv_ann_wnd <= 0xffff);
@@ -959,8 +910,7 @@ namespace uITron3
 				len <= 0xffff - pcb.rcv_wnd);
 
 			pcb.rcv_wnd += len;
-			if (pcb.rcv_wnd > opt.TCP_WND)
-			{
+			if (pcb.rcv_wnd > opt.TCP_WND) {
 				pcb.rcv_wnd = opt.TCP_WND;
 			}
 
@@ -970,8 +920,7 @@ namespace uITron3
 			 * watermark is opt.TCP_WND/4), then send an explicit update now.
 			 * Otherwise wait for a packet to be sent in the normal course of
 			 * events (or more window to be available later) */
-			if (wnd_inflation >= opt.TCP_WND_UPDATE_THRESHOLD)
-			{
+			if (wnd_inflation >= opt.TCP_WND_UPDATE_THRESHOLD) {
 				tcp.tcp_ack_now(pcb);
 				tcp_output(pcb);
 			}
@@ -992,19 +941,14 @@ namespace uITron3
 			tcp_pcb_common pcb;
 
 		again:
-			if (tcp_port++ == TCP_LOCAL_PORT_RANGE_END)
-			{
+			if (tcp_port++ == TCP_LOCAL_PORT_RANGE_END) {
 				tcp_port = TCP_LOCAL_PORT_RANGE_START;
 			}
 			/* Check all PCB lists. */
-			for (i = 0; i < NUM_TCP_PCB_LISTS; i++)
-			{
-				for (pcb = tcp_pcb_lists[i]; pcb != null; pcb = pcb.next)
-				{
-					if (pcb.local_port == tcp_port)
-					{
-						if (++n > (TCP_LOCAL_PORT_RANGE_END - TCP_LOCAL_PORT_RANGE_START))
-						{
+			for (i = 0; i < NUM_TCP_PCB_LISTS; i++) {
+				for (pcb = tcp_pcb_lists[i]; pcb != null; pcb = pcb.next) {
+					if (pcb.local_port == tcp_port) {
+						if (++n > (TCP_LOCAL_PORT_RANGE_END - TCP_LOCAL_PORT_RANGE_START)) {
 							return 0;
 						}
 						goto again;
@@ -1036,49 +980,40 @@ namespace uITron3
 			if (lwip.LWIP_ERROR("tcp_connect: can only connect from state tcp_state.CLOSED", pcb.state == tcp_state.CLOSED)) return err_t.ERR_ISCONN;
 
 			lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_connect to port {0}\n", port);
-			if (ipaddr != null)
-			{
+			if (ipaddr != null) {
 				ip_addr.ip_addr_copy(pcb.remote_ip, ipaddr);
 			}
-			else
-			{
+			else {
 				return err_t.ERR_VAL;
 			}
 			pcb.remote_port = port;
 
 			/* check if we have a route to the remote host */
-			if (ip_addr.ip_addr_isany(pcb.local_ip))
-			{
+			if (ip_addr.ip_addr_isany(pcb.local_ip)) {
 				/* Use the netif's IP address as local address. */
 				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip_addr);
 			}
 
 			old_local_port = pcb.local_port;
-			if (pcb.local_port == 0)
-			{
+			if (pcb.local_port == 0) {
 				pcb.local_port = tcp_new_port();
-				if (pcb.local_port == 0)
-				{
+				if (pcb.local_port == 0) {
 					return err_t.ERR_BUF;
 				}
 			}
 #if SO_REUSE
-			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
-			{
+			if (lwip.ip_get_option(pcb, sof.SOF_REUSEADDR)) {
 				/* Since sof.SOF_REUSEADDR allows reusing a local address, we have to make sure
 				   now that the 5-tuple is unique. */
 				tcp_pcb cpcb;
 				int i;
 				/* Don't check listen- and bound-PCBs, check active- and TIME-WAIT PCBs. */
-				for (i = 2; i < NUM_TCP_PCB_LISTS; i++)
-				{
-					for (cpcb = (tcp_pcb)tcp_pcb_lists[i]; cpcb != null; cpcb = (tcp_pcb)cpcb.next)
-					{
+				for (i = 2; i < NUM_TCP_PCB_LISTS; i++) {
+					for (cpcb = (tcp_pcb)tcp_pcb_lists[i]; cpcb != null; cpcb = (tcp_pcb)cpcb.next) {
 						if ((cpcb.local_port == pcb.local_port) &&
 							(cpcb.remote_port == port) &&
 							ip_addr.ip_addr_cmp(cpcb.local_ip, pcb.local_ip) &&
-							ip_addr.ip_addr_cmp(cpcb.remote_ip, ipaddr))
-						{
+							ip_addr.ip_addr_cmp(cpcb.remote_ip, ipaddr)) {
 							/* linux returns EISCONN here, but err_t.ERR_USE should be OK for us */
 							return err_t.ERR_USE;
 						}
@@ -1111,12 +1046,10 @@ namespace uITron3
 
 			/* Send a SYN together with the MSS option. */
 			ret = tcp_enqueue_flags(pcb, tcp.TCP_SYN);
-			if (ret == err_t.ERR_OK)
-			{
+			if (ret == err_t.ERR_OK) {
 				/* SYN segment was enqueued, changed the pcbs state now */
 				pcb.state = tcp_state.SYN_SENT;
-				if (old_local_port != 0)
-				{
+				if (old_local_port != 0) {
 					TCP_RMV(ref tcp_bound_pcbs, pcb);
 				}
 				TCP_REG_ACTIVE(pcb);
@@ -1151,18 +1084,15 @@ namespace uITron3
 			/* Steps through all of the active PCBs. */
 			prev = null;
 			pcb = tcp_active_pcbs;
-			if (pcb == null)
-			{
+			if (pcb == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: no active pcbs\n");
 			}
-			while (pcb != null)
-			{
+			while (pcb != null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: processing active pcb\n");
 				lwip.LWIP_ASSERT("tcp_slowtmr: active pcb.state != tcp_state.CLOSED\n", pcb.state != tcp_state.CLOSED);
 				lwip.LWIP_ASSERT("tcp_slowtmr: active pcb.state != tcp_state.LISTEN\n", pcb.state != tcp_state.LISTEN);
 				lwip.LWIP_ASSERT("tcp_slowtmr: active pcb.state != TIME-WAIT\n", pcb.state != tcp_state.TIME_WAIT);
-				if (pcb.last_timer == tcp_timer_ctr)
-				{
+				if (pcb.last_timer == tcp_timer_ctr) {
 					/* skip this pcb, we have already processed it */
 					pcb = (tcp_pcb)pcb.next;
 					continue;
@@ -1172,43 +1102,34 @@ namespace uITron3
 				pcb_remove = 0;
 				pcb_reset = 0;
 
-				if (pcb.state == tcp_state.SYN_SENT && pcb.nrtx == opt.TCP_SYNMAXRTX)
-				{
+				if (pcb.state == tcp_state.SYN_SENT && pcb.nrtx == opt.TCP_SYNMAXRTX) {
 					++pcb_remove;
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: max SYN retries reached\n");
 				}
-				else if (pcb.nrtx == opt.TCP_MAXRTX)
-				{
+				else if (pcb.nrtx == opt.TCP_MAXRTX) {
 					++pcb_remove;
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: max DATA retries reached\n");
 				}
-				else
-				{
-					if (pcb.persist_backoff > 0)
-					{
+				else {
+					if (pcb.persist_backoff > 0) {
 						/* If snd_wnd is zero, use persist timer to send 1 byte probes
 						 * instead of using the standard retransmission mechanism. */
 						pcb.persist_cnt++;
-						if (pcb.persist_cnt >= tcp_persist_backoff[pcb.persist_backoff - 1])
-						{
+						if (pcb.persist_cnt >= tcp_persist_backoff[pcb.persist_backoff - 1]) {
 							pcb.persist_cnt = 0;
-							if (pcb.persist_backoff < tcp_persist_backoff.Length)
-							{
+							if (pcb.persist_backoff < tcp_persist_backoff.Length) {
 								pcb.persist_backoff++;
 							}
 							tcp_zero_window_probe(pcb);
 						}
 					}
-					else
-					{
+					else {
 						/* Increase the retransmission timer if it is running */
-						if (pcb.rtime >= 0)
-						{
+						if (pcb.rtime >= 0) {
 							++pcb.rtime;
 						}
 
-						if (pcb.unacked != null && pcb.rtime >= pcb.rto)
-						{
+						if (pcb.unacked != null && pcb.rtime >= pcb.rto) {
 							/* Time for a retransmission. */
 							lwip.LWIP_DEBUGF(opt.TCP_RTO_DEBUG, "tcp_slowtmr: rtime {0}"
 														+ " pcb.rto {1}\n",
@@ -1216,8 +1137,7 @@ namespace uITron3
 
 							/* Double retransmission time-out unless we are trying to
 							 * connect to somebody (i.e., we are in tcp_state.SYN_SENT). */
-							if (pcb.state != tcp_state.SYN_SENT)
-							{
+							if (pcb.state != tcp_state.SYN_SENT) {
 								pcb.rto = (short)(((pcb.sa >> 3) + pcb.sv) << tcp_backoff[pcb.nrtx]);
 							}
 
@@ -1227,8 +1147,7 @@ namespace uITron3
 							/* Reduce congestion window and ssthresh. */
 							eff_wnd = Math.Min(pcb.cwnd, pcb.snd_wnd);
 							pcb.ssthresh = (ushort)(eff_wnd >> 1);
-							if (pcb.ssthresh < (pcb.mss << 1))
-							{
+							if (pcb.ssthresh < (pcb.mss << 1)) {
 								pcb.ssthresh = (ushort)(pcb.mss << 1);
 							}
 							pcb.cwnd = pcb.mss;
@@ -1243,16 +1162,13 @@ namespace uITron3
 					}
 				}
 				/* Check if this PCB has stayed too long in FIN-WAIT-2 */
-				if (pcb.state == tcp_state.FIN_WAIT_2)
-				{
+				if (pcb.state == tcp_state.FIN_WAIT_2) {
 					/* If this PCB is in tcp_state.FIN_WAIT_2 because of SHUT_WR don't let it time out. */
-					if ((pcb.flags & tcp_pcb.TF_RXCLOSED) != 0)
-					{
+					if ((pcb.flags & tcp_pcb.TF_RXCLOSED) != 0) {
 						/* PCB was fully closed (either through close() or SHUT_RDWR):
 						   normal FIN-WAIT timeout handling. */
 						if ((uint)(tcp_ticks - pcb.tmr) >
-							tcp.TCP_FIN_WAIT_TIMEOUT / tcp.TCP_SLOW_INTERVAL)
-						{
+							tcp.TCP_FIN_WAIT_TIMEOUT / tcp.TCP_SLOW_INTERVAL) {
 							++pcb_remove;
 							lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: removing pcb stuck in FIN-WAIT-2\n");
 						}
@@ -1262,11 +1178,9 @@ namespace uITron3
 				/* Check if KEEPALIVE should be sent */
 				if (lwip.ip_get_option(pcb, (byte)sof.SOF_KEEPALIVE) &&
 				   ((pcb.state == tcp_state.ESTABLISHED) ||
-					(pcb.state == tcp_state.CLOSE_WAIT)))
-				{
+					(pcb.state == tcp_state.CLOSE_WAIT))) {
 					if ((uint)(tcp_ticks - pcb.tmr) >
-					   (pcb.keep_idle + TCP_KEEP_DUR(pcb)) / tcp.TCP_SLOW_INTERVAL)
-					{
+					   (pcb.keep_idle + TCP_KEEP_DUR(pcb)) / tcp.TCP_SLOW_INTERVAL) {
 						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: KEEPALIVE timeout. Aborting connection to {0}.{1}.{2}.{3}.\n",
 												ip_addr.ip4_addr1_16(pcb.remote_ip), ip_addr.ip4_addr2_16(pcb.remote_ip),
 												ip_addr.ip4_addr3_16(pcb.remote_ip), ip_addr.ip4_addr4_16(pcb.remote_ip));
@@ -1276,8 +1190,7 @@ namespace uITron3
 					}
 					else if ((uint)(tcp_ticks - pcb.tmr) >
 							(pcb.keep_idle + pcb.keep_cnt_sent * TCP_KEEP_INTVL(pcb))
-							/ tcp.TCP_SLOW_INTERVAL)
-					{
+							/ tcp.TCP_SLOW_INTERVAL) {
 						tcp_keepalive(pcb);
 						pcb.keep_cnt_sent++;
 					}
@@ -1288,8 +1201,7 @@ namespace uITron3
 				   be retransmitted). */
 #if TCP_QUEUE_OOSEQ
 				if (pcb.ooseq != null &&
-					(uint)tcp_ticks - pcb.tmr >= pcb.rto * TCP_OOSEQ_TIMEOUT)
-				{
+					(uint)tcp_ticks - pcb.tmr >= pcb.rto * TCP_OOSEQ_TIMEOUT) {
 					tcp_segs_free(pcb.ooseq);
 					pcb.ooseq = null;
 					lwip.LWIP_DEBUGF(opt.TCP_CWND_DEBUG, "tcp_slowtmr: dropping OOSEQ queued data\n");
@@ -1297,48 +1209,40 @@ namespace uITron3
 #endif // TCP_QUEUE_OOSEQ
 
 				/* Check if this PCB has stayed too long in SYN-RCVD */
-				if (pcb.state == tcp_state.SYN_RCVD)
-				{
+				if (pcb.state == tcp_state.SYN_RCVD) {
 					if ((uint)(tcp_ticks - pcb.tmr) >
-						tcp.TCP_SYN_RCVD_TIMEOUT / tcp.TCP_SLOW_INTERVAL)
-					{
+						tcp.TCP_SYN_RCVD_TIMEOUT / tcp.TCP_SLOW_INTERVAL) {
 						++pcb_remove;
 						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: removing pcb stuck in SYN-RCVD\n");
 					}
 				}
 
 				/* Check if this PCB has stayed too long in LAST-ACK */
-				if (pcb.state == tcp_state.LAST_ACK)
-				{
-					if ((uint)(tcp_ticks - pcb.tmr) > 2 * tcp.TCP_MSL / tcp.TCP_SLOW_INTERVAL)
-					{
+				if (pcb.state == tcp_state.LAST_ACK) {
+					if ((uint)(tcp_ticks - pcb.tmr) > 2 * tcp.TCP_MSL / tcp.TCP_SLOW_INTERVAL) {
 						++pcb_remove;
 						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: removing pcb stuck in LAST-ACK\n");
 					}
 				}
 
 				/* If the PCB should be removed, do it. */
-				if (pcb_remove != 0)
-				{
+				if (pcb_remove != 0) {
 					tcp_pcb pcb2;
 					tcp_err_fn err_fn;
 					object err_arg;
 					tcp_pcb_purge(pcb);
 					/* Remove PCB from tcp.tcp_active_pcbs list. */
-					if (prev != null)
-					{
+					if (prev != null) {
 						lwip.LWIP_ASSERT("tcp_slowtmr: middle tcp != tcp.tcp_active_pcbs", pcb != tcp_active_pcbs);
 						prev.next = pcb.next;
 					}
-					else
-					{
+					else {
 						/* This PCB was the first. */
 						lwip.LWIP_ASSERT("tcp_slowtmr: first pcb == tcp.tcp_active_pcbs", tcp_active_pcbs == pcb);
 						tcp_active_pcbs = (tcp_pcb)pcb.next;
 					}
 
-					if (pcb_reset != 0)
-					{
+					if (pcb_reset != 0) {
 						tcp_rst(pcb.snd_nxt, pcb.rcv_nxt, pcb.local_ip, pcb.remote_ip,
 							pcb.local_port, pcb.remote_port);
 					}
@@ -1351,68 +1255,55 @@ namespace uITron3
 
 					tcp_active_pcbs_changed = 0;
 					TCP_EVENT_ERR(err_fn, err_arg, err_t.ERR_ABRT);
-					if (tcp_active_pcbs_changed != 0)
-					{
+					if (tcp_active_pcbs_changed != 0) {
 						goto tcp_slowtmr_start;
 					}
 				}
-				else
-				{
+				else {
 					/* get the 'next' element now and work with 'prev' below (in case of abort) */
 					prev = pcb;
 					pcb = (tcp_pcb)pcb.next;
 
 					/* We check if we should poll the connection. */
 					++prev.polltmr;
-					if (prev.polltmr >= prev.pollinterval)
-					{
+					if (prev.polltmr >= prev.pollinterval) {
 						prev.polltmr = 0;
 						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_slowtmr: polling application\n");
 						tcp_active_pcbs_changed = 0;
 						TCP_EVENT_POLL(prev, out err);
-						if (tcp_active_pcbs_changed != 0)
-						{
+						if (tcp_active_pcbs_changed != 0) {
 							goto tcp_slowtmr_start;
 						}
 						/* if err == err_t.ERR_ABRT, 'prev' is already deallocated */
-						if (err == err_t.ERR_OK)
-						{
+						if (err == err_t.ERR_OK) {
 							tcp_output(prev);
 						}
 					}
 				}
 			}
 
-
 			/* Steps through all of the TIME-WAIT PCBs. */
 			prev = null;
 			pcb = tcp_tw_pcbs;
-			while (pcb != null)
-			{
+			while (pcb != null) {
 				lwip.LWIP_ASSERT("tcp_slowtmr: TIME-WAIT pcb.state == TIME-WAIT", pcb.state == tcp_state.TIME_WAIT);
 				pcb_remove = 0;
 
 				/* Check if this PCB has stayed long enough in TIME-WAIT */
-				if ((uint)(tcp_ticks - pcb.tmr) > 2 * tcp.TCP_MSL / tcp.TCP_SLOW_INTERVAL)
-				{
+				if ((uint)(tcp_ticks - pcb.tmr) > 2 * tcp.TCP_MSL / tcp.TCP_SLOW_INTERVAL) {
 					++pcb_remove;
 				}
 
-
-
 				/* If the PCB should be removed, do it. */
-				if (pcb_remove != 0)
-				{
+				if (pcb_remove != 0) {
 					tcp_pcb pcb2;
 					tcp_pcb_purge(pcb);
 					/* Remove PCB from tcp_tw_pcbs list. */
-					if (prev != null)
-					{
+					if (prev != null) {
 						lwip.LWIP_ASSERT("tcp_slowtmr: middle tcp != tcp_tw_pcbs", pcb != tcp_tw_pcbs);
 						prev.next = pcb.next;
 					}
-					else
-					{
+					else {
 						/* This PCB was the first. */
 						lwip.LWIP_ASSERT("tcp_slowtmr: first pcb == tcp_tw_pcbs", tcp_tw_pcbs == pcb);
 						tcp_tw_pcbs = (tcp_pcb)pcb.next;
@@ -1421,8 +1312,7 @@ namespace uITron3
 					pcb = (tcp_pcb)pcb.next;
 					lwip.memp_free(memp_t.MEMP_TCP_PCB, pcb2);
 				}
-				else
-				{
+				else {
 					prev = pcb;
 					pcb = (tcp_pcb)pcb.next;
 				}
@@ -1444,15 +1334,12 @@ namespace uITron3
 		tcp_fasttmr_start:
 			pcb = tcp_active_pcbs;
 
-			while (pcb != null)
-			{
-				if (pcb.last_timer != tcp_timer_ctr)
-				{
+			while (pcb != null) {
+				if (pcb.last_timer != tcp_timer_ctr) {
 					tcp_pcb next;
 					pcb.last_timer = tcp_timer_ctr;
 					/* send delayed ACKs */
-					if ((pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0)
-					{
+					if ((pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0) {
 						lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_fasttmr: delayed ACK\n");
 						tcp.tcp_ack_now(pcb);
 						tcp_output(pcb);
@@ -1462,12 +1349,10 @@ namespace uITron3
 					next = (tcp_pcb)pcb.next;
 
 					/* If there is data which was previously "refused" by upper layer */
-					if (pcb.refused_data != null)
-					{
+					if (pcb.refused_data != null) {
 						tcp_active_pcbs_changed = 0;
 						tcp_process_refused_data(pcb);
-						if (tcp_active_pcbs_changed != 0)
-						{
+						if (tcp_active_pcbs_changed != 0) {
 							/* application callback has changed the pcb list: restart the loop */
 							goto tcp_fasttmr_start;
 						}
@@ -1489,34 +1374,28 @@ namespace uITron3
 			/* Notify again application with data previously received. */
 			lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: notify kept packet\n");
 			TCP_EVENT_RECV(pcb, refused_data, err_t.ERR_OK, out err);
-			if (err == err_t.ERR_OK)
-			{
+			if (err == err_t.ERR_OK) {
 				/* did refused_data include a FIN? */
-				if ((refused_flags & pbuf.PBUF_FLAG_TCP_FIN) != 0)
-				{
+				if ((refused_flags & pbuf.PBUF_FLAG_TCP_FIN) != 0) {
 					/* correct rcv_wnd as the application won't call tcp_recved()
 					   for the FIN's seqno */
-					if (pcb.rcv_wnd != opt.TCP_WND)
-					{
+					if (pcb.rcv_wnd != opt.TCP_WND) {
 						pcb.rcv_wnd++;
 					}
 					TCP_EVENT_CLOSED(pcb, out err);
-					if (err == err_t.ERR_ABRT)
-					{
+					if (err == err_t.ERR_ABRT) {
 						return err_t.ERR_ABRT;
 					}
 				}
 			}
-			else if (err == err_t.ERR_ABRT)
-			{
+			else if (err == err_t.ERR_ABRT) {
 				/* if err == err_t.ERR_ABRT, 'pcb' is already deallocated */
 				/* Drop incoming packets because pcb is "full" (only if the incoming
 				   segment contains data). */
 				lwip.LWIP_DEBUGF(opt.TCP_INPUT_DEBUG, "tcp_input: drop incoming packets, because pcb is \"full\"\n");
 				return err_t.ERR_ABRT;
 			}
-			else
-			{
+			else {
 				/* data is still refused, pbuf is still valid (go on for ACK-only packets) */
 				pcb.refused_data = refused_data;
 			}
@@ -1530,8 +1409,7 @@ namespace uITron3
 		 */
 		public void tcp_segs_free(tcp_seg seg)
 		{
-			while (seg != null)
-			{
+			while (seg != null) {
 				tcp_seg next = seg.next;
 				tcp_seg_free(seg);
 				seg = next;
@@ -1545,10 +1423,8 @@ namespace uITron3
 		 */
 		public void tcp_seg_free(tcp_seg seg)
 		{
-			if (seg != null)
-			{
-				if (seg.p != null)
-				{
+			if (seg != null) {
+				if (seg.p != null) {
 					lwip.pbuf_free(seg.p);
 #if TCP_DEBUG
 					seg.p = null;
@@ -1582,8 +1458,7 @@ namespace uITron3
 			tcp_seg cseg;
 
 			cseg = (tcp_seg)lwip.memp_malloc(memp_t.MEMP_TCP_SEG);
-			if (cseg == null)
-			{
+			if (cseg == null) {
 				return null;
 			}
 			//opt.SMEMCPY(cseg, seg, tcp_seg.length);
@@ -1601,13 +1476,11 @@ namespace uITron3
 		public err_t tcp_recv_null(object arg, tcp_pcb pcb, pbuf p, err_t err)
 		{
 			//LWIP_UNUSED_ARG(arg);
-			if (p != null)
-			{
+			if (p != null) {
 				tcp_recved(pcb, p.tot_len);
 				lwip.pbuf_free(p);
 			}
-			else if (err == err_t.ERR_OK)
-			{
+			else if (err == err_t.ERR_OK) {
 				return tcp_close(pcb);
 			}
 			return err_t.ERR_OK;
@@ -1626,25 +1499,21 @@ namespace uITron3
 			uint inactivity;
 			byte mprio;
 
-
 			mprio = TCP_PRIO_MAX;
 
 			/* We kill the oldest active connection that has lower priority than prio. */
 			inactivity = 0;
 			inactive = null;
-			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
+			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 				if (pcb.prio <= prio &&
 					pcb.prio <= mprio &&
-					(uint)(tcp_ticks - pcb.tmr) >= inactivity)
-				{
+					(uint)(tcp_ticks - pcb.tmr) >= inactivity) {
 					inactivity = tcp_ticks - pcb.tmr;
 					inactive = pcb;
 					mprio = pcb.prio;
 				}
 			}
-			if (inactive != null)
-			{
+			if (inactive != null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_kill_prio: killing oldest PCB {0} ({1})\n",
 					   inactive, inactivity);
 				tcp_abort(inactive);
@@ -1663,16 +1532,13 @@ namespace uITron3
 			inactivity = 0;
 			inactive = null;
 			/* Go through the list of tcp_state.TIME_WAIT pcbs and get the oldest pcb. */
-			for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
-				if ((uint)(tcp_ticks - pcb.tmr) >= inactivity)
-				{
+			for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
+				if ((uint)(tcp_ticks - pcb.tmr) >= inactivity) {
 					inactivity = tcp_ticks - pcb.tmr;
 					inactive = pcb;
 				}
 			}
-			if (inactive != null)
-			{
+			if (inactive != null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_kill_timewait: killing oldest TIME-WAIT PCB {0} ({1})\n",
 					   inactive, inactivity);
 				tcp_abort(inactive);
@@ -1691,34 +1557,29 @@ namespace uITron3
 			uint iss;
 
 			pcb = (tcp_pcb)lwip.memp_malloc(memp_t.MEMP_TCP_PCB);
-			if (pcb == null)
-			{
+			if (pcb == null) {
 				/* Try killing oldest connection in TIME-WAIT. */
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_alloc: killing off oldest TIME-WAIT connection\n");
 				tcp_kill_timewait();
 				/* Try to allocate a tcp_pcb again. */
 				pcb = (tcp_pcb)lwip.memp_malloc(memp_t.MEMP_TCP_PCB);
-				if (pcb == null)
-				{
+				if (pcb == null) {
 					/* Try killing active connections with lower priority than the new one. */
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_alloc: killing connection with prio lower than {0}\n", prio);
 					tcp_kill_prio(prio);
 					/* Try to allocate a tcp_pcb again. */
 					pcb = (tcp_pcb)lwip.memp_malloc(memp_t.MEMP_TCP_PCB);
-					if (pcb != null)
-					{
+					if (pcb != null) {
 						/* adjust err stats: lwip.memp_malloc failed twice before */
 						--lwip.lwip_stats.memp[(int)memp_t.MEMP_TCP_PCB].err;
 					}
 				}
-				if (pcb != null)
-				{
+				if (pcb != null) {
 					/* adjust err stats: timewait PCB was freed above */
 					--lwip.lwip_stats.memp[(int)memp_t.MEMP_TCP_PCB].err;
 				}
 			}
-			if (pcb != null)
-			{
+			if (pcb != null) {
 				memp.memset(pcb, 0, tcp_pcb.length);
 				pcb.prio = prio;
 				pcb.snd_buf = opt.TCP_SND_BUF;
@@ -1850,7 +1711,6 @@ namespace uITron3
 		}
 #endif // LWIP_CALLBACK_API
 
-
 		/**
 		 * Used to specify the function that should be called periodically
 		 * from TCP. The interval is specified in terms of the TCP coarse
@@ -1878,24 +1738,20 @@ namespace uITron3
 		{
 			if (_pcb.state != tcp_state.CLOSED &&
 				_pcb.state != tcp_state.TIME_WAIT &&
-				_pcb.state != tcp_state.LISTEN)
-			{
+				_pcb.state != tcp_state.LISTEN) {
 				tcp_pcb pcb = (tcp_pcb)_pcb;
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_pcb_purge\n");
 
 #if TCP_LISTEN_BACKLOG
-				if (pcb.state == tcp_state.SYN_RCVD)
-				{
+				if (pcb.state == tcp_state.SYN_RCVD) {
 					/* Need to find the corresponding listen_pcb and decrease its accepts_pending */
 					tcp_pcb_listen lpcb;
 					lwip.LWIP_ASSERT("tcp_pcb_purge: pcb.state == tcp_state.SYN_RCVD but tcp_listen_pcbs is null",
 					tcp_listen_pcbs.listen_pcbs != null);
-					for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next)
-					{
+					for (lpcb = tcp_listen_pcbs.listen_pcbs; lpcb != null; lpcb = (tcp_pcb_listen)lpcb.next) {
 						if ((lpcb.local_port == pcb.local_port) &&
 							(ip_addr.ip_addr_isany(lpcb.local_ip) ||
-								ip_addr.ip_addr_cmp(pcb.local_ip, lpcb.local_ip)))
-						{
+								ip_addr.ip_addr_cmp(pcb.local_ip, lpcb.local_ip))) {
 							/* port and address of the listen pcb match the timed-out pcb */
 							lwip.LWIP_ASSERT("tcp_pcb_purge: listen pcb does not have accepts pending",
 								lpcb.accepts_pending > 0);
@@ -1906,23 +1762,19 @@ namespace uITron3
 				}
 #endif // TCP_LISTEN_BACKLOG
 
-				if (pcb.refused_data != null)
-				{
+				if (pcb.refused_data != null) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_pcb_purge: data left on .refused_data\n");
 					lwip.pbuf_free(pcb.refused_data);
 					pcb.refused_data = null;
 				}
-				if (pcb.unsent != null)
-				{
+				if (pcb.unsent != null) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_pcb_purge: not all data sent\n");
 				}
-				if (pcb.unacked != null)
-				{
+				if (pcb.unacked != null) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_pcb_purge: data left on .unacked\n");
 				}
 #if TCP_QUEUE_OOSEQ
-				if (pcb.ooseq != null)
-				{
+				if (pcb.ooseq != null) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_pcb_purge: data left on .ooseq\n");
 				}
 				tcp_segs_free(pcb.ooseq);
@@ -1954,13 +1806,11 @@ namespace uITron3
 
 			tcp_pcb_purge(pcb);
 
-			if (pcb.state != tcp_state.LISTEN)
-			{
+			if (pcb.state != tcp_state.LISTEN) {
 				tcp_pcb _pcb = (tcp_pcb)pcb;
 				/* if there is an outstanding delayed ACKs, send it */
 				if (_pcb.state != tcp_state.TIME_WAIT &&
-					(_pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0)
-				{
+					(_pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0) {
 					_pcb.flags |= tcp_pcb.TF_ACK_NOW;
 					tcp_output(_pcb);
 				}
@@ -2000,7 +1850,7 @@ namespace uITron3
 		{
 			ushort mss_s;
 
-			mss_s = (ushort)(lwip.mtu - lwip.IP_HLEN - tcp.TCP_HLEN);
+			mss_s = (ushort)(lwip.mtu - tcp.TCP_HLEN);
 			/* RFC 1122, chap 4.2.2.6:
 			 * Eff.snd.MSS = min(SendMSS+20, MMS_S) - TCPhdrsize - IPoptionsize
 			 * We correct for TCP options in tcp_write(), and don't support IP options.
@@ -2069,36 +1919,28 @@ namespace uITron3
 		 */
 		public static void tcp_debug_print_flags(byte flags)
 		{
-			if ((flags & tcp.TCP_FIN) != 0)
-			{
+			if ((flags & tcp.TCP_FIN) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "FIN ");
 			}
-			if ((flags & tcp.TCP_SYN) != 0)
-			{
+			if ((flags & tcp.TCP_SYN) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "SYN ");
 			}
-			if ((flags & tcp.TCP_RST) != 0)
-			{
+			if ((flags & tcp.TCP_RST) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "RST ");
 			}
-			if ((flags & tcp.TCP_PSH) != 0)
-			{
+			if ((flags & tcp.TCP_PSH) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "PSH ");
 			}
-			if ((flags & tcp.TCP_ACK) != 0)
-			{
+			if ((flags & tcp.TCP_ACK) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "ACK ");
 			}
-			if ((flags & tcp.TCP_URG) != 0)
-			{
+			if ((flags & tcp.TCP_URG) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "URG ");
 			}
-			if ((flags & tcp.TCP_ECE) != 0)
-			{
+			if ((flags & tcp.TCP_ECE) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "ECE ");
 			}
-			if ((flags & tcp.TCP_CWR) != 0)
-			{
+			if ((flags & tcp.TCP_CWR) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "CWR ");
 			}
 			//lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "\n");
@@ -2111,24 +1953,21 @@ namespace uITron3
 		{
 			tcp_pcb pcb;
 			lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "Active PCB states:\n");
-			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
+			for (pcb = tcp_active_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "Local port {0}, foreign port {1} snd_nxt {2} rcv_nxt {3} ",
 								   pcb.local_port, pcb.remote_port,
 								   pcb.snd_nxt, pcb.rcv_nxt);
 				tcp_debug_print_state(pcb.state);
 			}
 			lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "Listen PCB states:\n");
-			for (pcb = (tcp_pcb)tcp_listen_pcbs.pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
+			for (pcb = (tcp_pcb)tcp_listen_pcbs.pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "Local port {0}, foreign port {1} snd_nxt {2} rcv_nxt {3} ",
 								   pcb.local_port, pcb.remote_port,
 								   pcb.snd_nxt, pcb.rcv_nxt);
 				tcp_debug_print_state(pcb.state);
 			}
 			lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TIME-WAIT PCB states:\n");
-			for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next)
-			{
+			for (pcb = tcp_tw_pcbs; pcb != null; pcb = (tcp_pcb)pcb.next) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "Local port {0}, foreign port {1} snd_nxt {2} rcv_nxt {3} ",
 								   pcb.local_port, pcb.remote_port,
 								   pcb.snd_nxt, pcb.rcv_nxt);
@@ -2142,14 +1981,12 @@ namespace uITron3
 		public short tcp_pcbs_sane()
 		{
 			tcp_pcb_common pcb;
-			for (pcb = tcp_active_pcbs; pcb != null; pcb = pcb.next)
-			{
+			for (pcb = tcp_active_pcbs; pcb != null; pcb = pcb.next) {
 				lwip.LWIP_ASSERT("tcp_pcbs_sane: active pcb.state != tcp_state.CLOSED", pcb.state != tcp_state.CLOSED);
 				lwip.LWIP_ASSERT("tcp_pcbs_sane: active pcb.state != tcp_state.LISTEN", pcb.state != tcp_state.LISTEN);
 				lwip.LWIP_ASSERT("tcp_pcbs_sane: active pcb.state != TIME-WAIT", pcb.state != tcp_state.TIME_WAIT);
 			}
-			for (pcb = tcp_tw_pcbs; pcb != null; pcb = pcb.next)
-			{
+			for (pcb = tcp_tw_pcbs; pcb != null; pcb = pcb.next) {
 				lwip.LWIP_ASSERT("tcp_pcbs_sane: tw pcb.state == TIME-WAIT", pcb.state == tcp_state.TIME_WAIT);
 			}
 			return 1;

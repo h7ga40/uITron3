@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 
 namespace uITron3
 {
-	public class sys
+	internal partial class sys
 	{
 		lwip lwip;
+		Nucleus m_Nucleus;
 		static Random m_Random = new Random();
 		public static int LWIP_RAND() { return m_Random.Next(); }
 
@@ -17,22 +18,29 @@ namespace uITron3
 		public int lev;
 		public const int SYS_MBOX_EMPTY = -1;
 
-		public sys(lwip lwip)
+		public sys(lwip lwip, Nucleus nucleus)
 		{
 			this.lwip = lwip;
+			m_Nucleus = nucleus;
 		}
 
-		internal static uint sys_now()
+		internal uint sys_now()
 		{
-			return (uint)(DateTime.Now.Ticks / 10000);
+			SYSTIME time = new SYSTIME();
+
+			m_Nucleus.GetSystemTime(out time);
+
+			return (uint)(time.Value);
 		}
 
 		public void SYS_ARCH_PROTECT(int lvl)
 		{
+			m_Nucleus.LockCPU();
 		}
 
 		public void SYS_ARCH_UNPROTECT(int lvl)
 		{
+			m_Nucleus.UnlockCPU();
 		}
 
 		public void SYS_ARCH_DECL_PROTECT(int lvl)
@@ -54,12 +62,12 @@ namespace uITron3
 			Monitor.Exit(mem_mutex);
 		}
 
-		internal static void sys_init(lwip lwip)
+		internal static void sys_init(lwip lwip, Nucleus nucleus)
 		{
-			lwip.sys = new sys(lwip);
+			lwip.sys = new sys(lwip, nucleus);
 		}
 
-		internal static void tcp_timer_needed()
+		internal void tcp_timer_needed()
 		{
 
 		}
@@ -77,14 +85,11 @@ namespace uITron3
 
 	public class tcpip
 	{
-		internal static err_t tcpip_callback_with_block(Action<object> pbuf_free_ooseq_callback, object p, int v)
+		public delegate void tcpip_callback_fn(object arg);
+
+		public static err_t tcpip_callback_with_block(tcpip_callback_fn function, object arg, byte block)
 		{
 			return err_t.ERR_OK;
 		}
-	}
-
-	public class sys_timeo : memp
-	{
-		public sys_timeo(lwip lwip) : base(lwip) { }
 	}
 }

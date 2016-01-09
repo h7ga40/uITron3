@@ -293,11 +293,9 @@ again:
 			lwip.LWIP_ASSERT("plug_holes: mem.next <= MEM_SIZE_ALIGNED", mem.next <= mem.MEM_SIZE_ALIGNED);
 
 			nmem = new mem(ram, mem.next);
-			if (mem != nmem && nmem.used == 0 && nmem != ram_end)
-			{
+			if (mem != nmem && nmem.used == 0 && nmem != ram_end) {
 				/* if mem.next is unused and not end of ram, combine mem and mem.next */
-				if (lfree == nmem)
-				{
+				if (lfree == nmem) {
 					lfree = mem;
 				}
 				mem.next = nmem.next;
@@ -306,11 +304,9 @@ again:
 
 			/* plug hole backward */
 			pmem = new mem(ram, mem.prev);
-			if (pmem != mem && pmem.used == 0)
-			{
+			if (pmem != mem && pmem.used == 0) {
 				/* if mem.prev is unused, combine mem and mem.prev */
-				if (lfree == mem)
-				{
+				if (lfree == mem) {
 					lfree = pmem;
 				}
 				pmem.next = mem.next;
@@ -346,8 +342,7 @@ again:
 
 			lwip_stats.mem.avail = (uint)mem.MEM_SIZE_ALIGNED;
 
-			if (sys.sys_mutex_new(mem_mutex) != err_t.ERR_OK)
-			{
+			if (sys.sys_mutex_new(mem_mutex) != err_t.ERR_OK) {
 				lwip.LWIP_ASSERT("failed to create mem_mutex", false);
 			}
 		}
@@ -363,8 +358,7 @@ again:
 			mem mem;
 			LWIP_MEM_FREE_DECL_PROTECT();
 
-			if (rmem == null)
-			{
+			if (rmem == null) {
 				lwip.LWIP_DEBUGF(opt.MEM_DEBUG | lwip.LWIP_DBG_TRACE | lwip.LWIP_DBG_LEVEL_SERIOUS, "mem_free(p == null) was called.\n");
 				return;
 			}
@@ -373,8 +367,7 @@ again:
 			lwip.LWIP_ASSERT("mem_free: legal memory", rmem >= ram &&
 				rmem < ram_end);
 
-			if (rmem < ram || rmem >= ram_end)
-			{
+			if (rmem < ram || rmem >= ram_end) {
 				sys.SYS_ARCH_DECL_PROTECT(sys.lev);
 				lwip.LWIP_DEBUGF(opt.MEM_DEBUG | lwip.LWIP_DBG_LEVEL_SEVERE, "mem_free: illegal memory\n");
 				/* protect mem stats from concurrent access */
@@ -392,8 +385,7 @@ again:
 			/* ... and is now unused. */
 			mem.used = 0;
 
-			if (mem < lfree)
-			{
+			if (mem < lfree) {
 				/* the newly freed struct is now the lowest */
 				lfree = mem;
 			}
@@ -430,21 +422,18 @@ again:
 			   adjust for alignment. */
 			newsize = lwip.LWIP_MEM_ALIGN_SIZE(newsize);
 
-			if (newsize < mem.MIN_SIZE_ALIGNED)
-			{
+			if (newsize < mem.MIN_SIZE_ALIGNED) {
 				/* every data block must be at least MIN_SIZE_ALIGNED long */
 				newsize = mem.MIN_SIZE_ALIGNED;
 			}
 
-			if (newsize > mem.MEM_SIZE_ALIGNED)
-			{
+			if (newsize > mem.MEM_SIZE_ALIGNED) {
 				return null;
 			}
 
 			lwip.LWIP_ASSERT("mem_trim: legal memory", rmem >= ram && rmem < ram_end);
 
-			if (rmem < ram || rmem >= ram_end)
-			{
+			if (rmem < ram || rmem >= ram_end) {
 				sys.SYS_ARCH_DECL_PROTECT(sys.lev);
 				lwip.LWIP_DEBUGF(opt.MEM_DEBUG | lwip.LWIP_DBG_LEVEL_SEVERE, "mem_trim: illegal memory\n");
 				/* protect mem stats from concurrent access */
@@ -460,13 +449,11 @@ again:
 
 			size = mem.next - ptr - mem.SIZEOF_STRUCT_MEM;
 			lwip.LWIP_ASSERT("mem_trim can only shrink memory", newsize <= size);
-			if (newsize > size)
-			{
+			if (newsize > size) {
 				/* not supported */
 				return null;
 			}
-			if (newsize == size)
-			{
+			if (newsize == size) {
 				/* No change in size, simply return */
 				return rmem;
 			}
@@ -475,16 +462,14 @@ again:
 			LWIP_MEM_FREE_PROTECT();
 
 			mem2 = new mem(ram, mem.next);
-			if (mem2.used == 0)
-			{
+			if (mem2.used == 0) {
 				/* The next is unused, we can simply move it at little */
 				int next;
 				/* remember the old next pointer */
 				next = mem2.next;
 				/* create new struct mem which is moved directly after the shrinked mem */
 				ptr2 = ptr + mem.SIZEOF_STRUCT_MEM + (int)newsize;
-				if (lfree == mem2)
-				{
+				if (lfree == mem2) {
 					lfree = new mem(ram, ptr2);
 				}
 				mem2 = new mem(ram, ptr2);
@@ -498,15 +483,13 @@ again:
 				/* last thing to restore linked list: as we have moved mem2,
 				 * let 'mem2.next.prev' point to mem2 again. but only if mem2.next is not
 				 * the end of the heap */
-				if (mem2.next != mem.MEM_SIZE_ALIGNED)
-				{
+				if (mem2.next != mem.MEM_SIZE_ALIGNED) {
 					(new mem(ram, mem2.next)).prev = ptr2;
 				}
 				lwip_stats.mem.used -= (uint)(size - newsize);
 				/* no need to plug holes, we've already done that */
 			}
-			else if (newsize + mem.SIZEOF_STRUCT_MEM + mem.MIN_SIZE_ALIGNED <= size)
-			{
+			else if (newsize + mem.SIZEOF_STRUCT_MEM + mem.MIN_SIZE_ALIGNED <= size) {
 				/* Next struct is used but there's room for another struct mem with
 				 * at least MIN_SIZE_ALIGNED of data.
 				 * Old size ('size') must be big enough to contain at least 'newsize' plus a struct mem
@@ -516,16 +499,14 @@ again:
 				 *       the 2 regions would be combined, resulting in more free memory */
 				ptr2 = ptr + mem.SIZEOF_STRUCT_MEM + (int)newsize;
 				mem2 = new mem(ram, ptr2);
-				if (mem2 < lfree)
-				{
+				if (mem2 < lfree) {
 					lfree = mem2;
 				}
 				mem2.used = 0;
 				mem2.next = mem.next;
 				mem2.prev = ptr;
 				mem.next = ptr2;
-				if (mem2.next != mem.MEM_SIZE_ALIGNED)
-				{
+				if (mem2.next != mem.MEM_SIZE_ALIGNED) {
 					(new mem(ram, mem2.next)).prev = ptr2;
 				}
 				lwip_stats.mem.used -= (uint)(size - newsize);
@@ -562,8 +543,7 @@ again:
 #endif // LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
 			LWIP_MEM_ALLOC_DECL_PROTECT();
 
-			if (size == 0)
-			{
+			if (size == 0) {
 				return null;
 			}
 
@@ -571,14 +551,12 @@ again:
 			   adjust for alignment. */
 			size = lwip.LWIP_MEM_ALIGN_SIZE(size);
 
-			if (size < mem.MIN_SIZE_ALIGNED)
-			{
+			if (size < mem.MIN_SIZE_ALIGNED) {
 				/* every data block must be at least MIN_SIZE_ALIGNED long */
 				size = mem.MIN_SIZE_ALIGNED;
 			}
 
-			if (size > mem.MEM_SIZE_ALIGNED)
-			{
+			if (size > mem.MEM_SIZE_ALIGNED) {
 				return null;
 			}
 
@@ -596,8 +574,7 @@ again:
 			 * beginning with the lowest free block.
 			 */
 			for (ptr = lfree - ram; ptr < mem.MEM_SIZE_ALIGNED - size;
-				 ptr = (new mem(ram, ptr)).next)
-			{
+				 ptr = (new mem(ram, ptr)).next) {
 				mem = new mem(ram, ptr);
 #if LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
 				mem_free_count = 0;
@@ -614,13 +591,11 @@ again:
 #endif // LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
 
 				if ((mem.used == 0) &&
-					(mem.next - (ptr + mem.SIZEOF_STRUCT_MEM)) >= size)
-				{
+					(mem.next - (ptr + mem.SIZEOF_STRUCT_MEM)) >= size) {
 					/* mem is not used and at least perfect fit is possible:
 					 * mem.next - (ptr + SIZEOF_STRUCT_MEM) gives us the 'user data size' of mem */
 
-					if (mem.next - (ptr + mem.SIZEOF_STRUCT_MEM) >= (size + mem.SIZEOF_STRUCT_MEM + mem.MIN_SIZE_ALIGNED))
-					{
+					if (mem.next - (ptr + mem.SIZEOF_STRUCT_MEM) >= (size + mem.SIZEOF_STRUCT_MEM + mem.MIN_SIZE_ALIGNED)) {
 						/* (in addition to the above, we test if another mem (SIZEOF_STRUCT_MEM) containing
 						 * at least MIN_SIZE_ALIGNED of data also fits in the 'user data space' of 'mem')
 						 * . split large block, create empty remainder,
@@ -641,18 +616,15 @@ again:
 						mem.next = ptr2;
 						mem.used = 1;
 
-						if (mem2.next != mem.MEM_SIZE_ALIGNED)
-						{
+						if (mem2.next != mem.MEM_SIZE_ALIGNED) {
 							(new mem(ram, mem2.next)).prev = ptr2;
 						}
 						lwip_stats.mem.used += (uint)(size + mem.SIZEOF_STRUCT_MEM);
-						if (lwip_stats.mem.max < lwip_stats.mem.used)
-						{
+						if (lwip_stats.mem.max < lwip_stats.mem.used) {
 							lwip_stats.mem.max = lwip_stats.mem.used;
 						}
 					}
-					else
-					{
+					else {
 						/* (a mem2 struct does no fit into the user data space of mem and mem.next will always
 						 * be used at this point: if not we have 2 unused structs in a row, plug_holes should have
 						 * take care of this).
@@ -662,20 +634,17 @@ again:
 						 */
 						mem.used = 1;
 						lwip_stats.mem.used += (uint)(mem.next - (mem - ram));
-						if (lwip_stats.mem.max < lwip_stats.mem.used)
-						{
+						if (lwip_stats.mem.max < lwip_stats.mem.used) {
 							lwip_stats.mem.max = lwip_stats.mem.used;
 						}
 					}
 #if LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
 				mem_malloc_adjust_lfree:
 #endif // LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
-					if (mem == lfree)
-					{
+					if (mem == lfree) {
 						mem cur = lfree;
 						/* Find next free block after mem and update lowest free pointer */
-						while (cur.used != 0 && cur != ram_end)
-						{
+						while (cur.used != 0 && cur != ram_end) {
 #if LWIP_ALLOW_MEM_FREE_FROM_OTHER_CONTEXT
 							mem_free_count = 0;
 							LWIP_MEM_ALLOC_UNPROTECT();
@@ -733,8 +702,7 @@ again:
 
 			/* allocate 'count' objects of size 'size' */
 			p = mem_malloc(count * size);
-			if (p != null)
-			{
+			if (p != null) {
 				/* zero the memory */
 				mem.memset(p, 0, count * size);
 			}

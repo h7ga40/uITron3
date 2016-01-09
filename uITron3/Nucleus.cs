@@ -35,8 +35,10 @@ namespace uITron3
 		List<CyclicHandler> m_CyclicHandlerTable = new List<CyclicHandler>();
 		lwip m_lwIP;
 		List<UdpCep> m_UdpCepTable = new List<UdpCep>();
+		List<Udp6Cep> m_Udp6CepTable = new List<Udp6Cep>();
 		List<TcpCep> m_TcpCepTable = new List<TcpCep>();
 		List<TcpRep> m_TcpRepTable = new List<TcpRep>();
+		PacketBridge m_IPPacketBridge;
 		long m_Lock;
 
 		public Nucleus(IKernel kernel, int sysTmrIntNo, TMO sysTmrIntv)
@@ -53,6 +55,17 @@ namespace uITron3
 			m_SysTime.Value = 0;
 			m_CurrentTask = null;
 			m_lwIP = new lwip(ip_output);
+#if LWIP_STATS
+			stats.stats_init();
+#endif
+			sys.sys_init(m_lwIP, this);
+
+			m_lwIP.mem_init();
+			lwip.memp_init();
+			pbuf.pbuf_init(m_lwIP);
+
+			udp.udp_init(m_lwIP);
+			tcp.tcp_init(m_lwIP);
 		}
 
 		public int SysTmrIntNo { get { return m_SysTmrIntNo; } }
@@ -73,22 +86,6 @@ namespace uITron3
 
 		public void Start()
 		{
-#if LWIP_STATS
-			stats.stats_init();
-#endif
-			sys.sys_init(m_lwIP);
-
-			m_lwIP.mem_init();
-			lwip.memp_init();
-			pbuf.pbuf_init(m_lwIP);
-
-			udp.udp_init(m_lwIP);
-			tcp.tcp_init(m_lwIP);
-		}
-
-		private void ip_output(lwip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
-		{
-			throw new NotImplementedException();
 		}
 
 		public void OnSysTime()
@@ -118,6 +115,12 @@ namespace uITron3
 				}
 			}
 
+			foreach (Udp6Cep Udp6Cep in m_Udp6CepTable) {
+				if ((Udp6Cep != null) && (Udp6Cep.State)) {
+					Udp6Cep.Progress(m_SysTmrIntv);
+				}
+			}
+
 			foreach (TcpCep TcpCep in m_TcpCepTable) {
 				if ((TcpCep != null) && (TcpCep.State)) {
 					TcpCep.Progress(m_SysTmrIntv);
@@ -134,6 +137,12 @@ namespace uITron3
 			foreach (UdpCep UdpCep in m_UdpCepTable) {
 				if ((UdpCep != null) && (UdpCep.State)) {
 					UdpCep.CallTimeOut();
+				}
+			}
+
+			foreach (Udp6Cep Udp6Cep in m_Udp6CepTable) {
+				if ((Udp6Cep != null) && (Udp6Cep.State)) {
+					Udp6Cep.CallTimeOut();
 				}
 			}
 
@@ -866,6 +875,7 @@ namespace uITron3
 			Semaphore Semaphore;
 			CyclicHandler CyclicHandler;
 			UdpCep UdpCep;
+			Udp6Cep Udp6Cep;
 			TcpCep TcpCep;
 
 			while (m_CyclicHandlerTable.Count != 0) {
@@ -931,6 +941,12 @@ namespace uITron3
 				UdpCep = m_UdpCepTable[0];
 				m_UdpCepTable.RemoveAt(0);
 				//delete UdpCep;
+			}
+
+			while (m_Udp6CepTable.Count != 0) {
+				Udp6Cep = m_Udp6CepTable[0];
+				m_Udp6CepTable.RemoveAt(0);
+				//delete Udp6Cep;
 			}
 
 			while (m_TcpCepTable.Count != 0) {
@@ -1035,6 +1051,99 @@ namespace uITron3
 
 			for (i = 0; i < m_UdpCepTable.Count; i++) {
 				Result = m_UdpCepTable[i];
+				if (cepid == Result.CepID) {
+					return Result;
+				}
+			}
+
+			return null;
+		}
+
+		internal ER CreateUdp6Cep(ID cepid, ref T_UDP6_CCEP pk_ccep, out ID p_cepid)
+		{
+			int i;
+
+			//if (pk_ccep == null)
+			//	return ER.E_PAR;
+
+			if (cepid == ID.ID_AUTO) {
+				//if (p_cepid == 0)
+				//	return ER.E_PAR;
+
+				cepid.Value = 1;
+
+				for (i = 0; ; i++) {
+					if (i >= m_Udp6CepTable.Count) {
+						Udp6Cep udpCep = new Udp6Cep(cepid, ref pk_ccep, this, m_lwIP);
+						m_Udp6CepTable.Add(udpCep);
+						break;
+					}
+
+					if (cepid == m_Udp6CepTable[i].CepID) {
+						cepid.Value++;
+					}
+					else {
+						Udp6Cep udpCep = new Udp6Cep(cepid, ref pk_ccep, this, m_lwIP);
+						m_Udp6CepTable.Insert(i, udpCep);
+						break;
+					}
+				}
+				p_cepid = cepid;
+			}
+			else {
+				ID tmpid;
+
+				p_cepid = ID.NULL;
+
+				for (i = 0; i < m_Udp6CepTable.Count; i++) {
+					tmpid = m_Udp6CepTable[i].CepID;
+
+					if (cepid == tmpid) {
+						return ER.E_OBJ;
+					}
+					else if (cepid < tmpid) {
+						break;
+					}
+				}
+				Udp6Cep udpCep = new Udp6Cep(cepid, ref pk_ccep, this, m_lwIP);
+				m_Udp6CepTable.Insert(i, udpCep);
+			}
+
+			return ER.E_OK;
+		}
+
+		public ER DeleteUdp6Cep(ID cepid)
+		{
+			int i;
+			ID tmpid;
+			Udp6Cep Udp6Cep;
+
+			for (i = 0; i < m_Udp6CepTable.Count; i++) {
+				Udp6Cep = m_Udp6CepTable[i];
+				tmpid = Udp6Cep.CepID;
+
+				if (cepid == tmpid) {
+					m_Udp6CepTable.RemoveAt(i);
+
+					//delete Udp6Cep;
+
+					return ER.E_OK;
+				}
+				else if (cepid < tmpid) {
+					break;
+				}
+			}
+
+			return ER.E_OBJ;
+		}
+
+		internal Udp6Cep GetUdp6Cep(ID cepid)
+		{
+			int i;
+			Udp6Cep Result;
+
+			for (i = 0; i < m_Udp6CepTable.Count; i++) {
+				Result = m_Udp6CepTable[i];
 				if (cepid == Result.CepID) {
 					return Result;
 				}
@@ -1227,6 +1336,67 @@ namespace uITron3
 			}
 
 			return null;
+		}
+
+		public PacketBridge IPPacketBridge
+		{
+			get { return m_IPPacketBridge; }
+			set
+			{
+				if (m_IPPacketBridge != null)
+					m_IPPacketBridge.InputData = null;
+				m_IPPacketBridge = value;
+				m_IPPacketBridge.InputData = new PacketBridgeInputData(IPPacketBridge_InputData);
+			}
+		}
+
+		public ip_addr IP4Addr { get { return m_lwIP.ip_addr; } }
+		public ip_addr SubNetMask { get { return m_lwIP.netmask; } }
+
+		public void SetIPv4Addr(uint addr, uint mask)
+		{
+			m_lwIP.ip_addr.addr = lwip.lwip_htonl(addr);
+			m_lwIP.netmask.addr = lwip.lwip_htonl(mask);
+		}
+
+		private ER IPPacketBridge_InputData(byte[] data)
+		{
+			if (data[0] == 4) {
+				pointer ipv4;
+				int len;
+				ip_addr src, dst;
+				byte proto;
+
+				ipv4 = Itron.CastIp4Packet(data, out len, out src, out dst, out proto);
+
+				m_lwIP.input(ipv4, len, src, dst, proto);
+
+				return ER.E_OK;
+			}
+			else if (data[0] == 6) {
+				pointer ipv6;
+				int len;
+				ip6_addr src, dst;
+				byte proto;
+
+				ipv6 = Itron.CastIp6Packet(data, out len, out src, out dst, out proto);
+
+				//m_lwIP.input(ipv6, len, src, dst, proto);
+
+				return ER.E_OK;
+			}
+
+			return ER.E_PAR;
+		}
+
+		private void ip_output(lwip netif, byte[] packet, ip_addr src, ip_addr dest, byte proto)
+		{
+			if (m_IPPacketBridge == null)
+				return;
+
+			byte[] data = Itron.GetIp4Packet(new pointer(packet, 0), packet.Length, src, dest, proto);
+
+			m_IPPacketBridge.OutputData(data);
 		}
 	}
 }

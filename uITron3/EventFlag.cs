@@ -88,7 +88,7 @@ namespace uITron3
 			if ((wfmode & MODE.TWF_ORW) != 0)
 				return (m_FlagPattern & waiptn) != 0;
 			else
-				return (m_FlagPattern & waiptn) == 0;
+				return (m_FlagPattern & waiptn) == waiptn;
 		}
 
 		public ER SetEventFlag(FLGPTN setptn)

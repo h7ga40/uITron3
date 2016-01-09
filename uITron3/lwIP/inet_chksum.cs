@@ -98,8 +98,7 @@ namespace uITron3
 			acc = 0;
 			/* dataptr may be at odd or even addresses */
 			octetptr = 0;
-			while (len > 1)
-			{
+			while (len > 1) {
 				/* declare first octet as most significant
 				   thus assume network order, ignoring host order */
 				src = (ushort)(dataptr[octetptr] << 8);
@@ -110,16 +109,14 @@ namespace uITron3
 				acc += src;
 				len -= 2;
 			}
-			if (len > 0)
-			{
+			if (len > 0) {
 				/* accumulate remaining octet */
 				src = (ushort)(dataptr[octetptr] << 8);
 				acc += src;
 			}
 			/* add deferred carry bits */
 			acc = (uint)((acc >> 16) + (acc & 0x0000ffffUL));
-			if ((acc & 0xffff0000UL) != 0)
-			{
+			if ((acc & 0xffff0000UL) != 0) {
 				acc = (uint)((acc >> 16) + (acc & 0x0000ffffUL));
 			}
 			/* This maybe a little confusing: reorder sum using htons()
@@ -301,8 +298,7 @@ namespace uITron3
 			acc = 0;
 			swapped = 0;
 			/* iterate through all pbuf in chain */
-			for (q = p; q != null; q = q.next)
-			{
+			for (q = p; q != null; q = q.next) {
 				lwip.LWIP_DEBUGF(opt.INET_DEBUG, "inet_chksum_pseudo(): checksumming pbuf {0} (has next {1}) \n",
 				  q, q.next);
 				acc += LWIP_CHKSUM(q.payload, q.len);
@@ -310,16 +306,14 @@ namespace uITron3
 				/* just executing this next line is probably faster that the if statement needed
 				   to check whether we really need to execute it, and does no harm */
 				acc = FOLD_U32T(acc);
-				if (q.len % 2 != 0)
-				{
+				if (q.len % 2 != 0) {
 					swapped = (byte)(1 - swapped);
 					acc = SWAP_BYTES_IN_WORD((ushort)acc);
 				}
 				/*lwip.LWIP_DEBUGF(opt.INET_DEBUG, "inet_chksum_pseudo(): wrapped lwip_chksum()={0} \n", acc);*/
 			}
 
-			if (swapped != 0)
-			{
+			if (swapped != 0) {
 				acc = SWAP_BYTES_IN_WORD((ushort)acc);
 			}
 			addr = ip_addr.ip4_addr_get_u32(src);
@@ -364,13 +358,11 @@ namespace uITron3
 			acc = 0;
 			swapped = 0;
 			/* iterate through all pbuf in chain */
-			for (q = p; (q != null) && (chksum_len > 0); q = q.next)
-			{
+			for (q = p; (q != null) && (chksum_len > 0); q = q.next) {
 				lwip.LWIP_DEBUGF(opt.INET_DEBUG, "inet_chksum_pseudo(): checksumming pbuf {0} (has next {1}) \n",
 					q, q.next);
 				chklen = q.len;
-				if (chklen > chksum_len)
-				{
+				if (chklen > chksum_len) {
 					chklen = chksum_len;
 				}
 				acc += LWIP_CHKSUM(q.payload, chklen);
@@ -379,16 +371,14 @@ namespace uITron3
 				/*lwip.LWIP_DEBUGF(opt.INET_DEBUG, "inet_chksum_pseudo(): unwrapped lwip_chksum()={0} \n", acc);*/
 				/* fold the upper bit down */
 				acc = FOLD_U32T(acc);
-				if (q.len % 2 != 0)
-				{
+				if (q.len % 2 != 0) {
 					swapped = (byte)(1 - swapped);
 					acc = SWAP_BYTES_IN_WORD((ushort)acc);
 				}
 				/*lwip.LWIP_DEBUGF(opt.INET_DEBUG, "inet_chksum_pseudo(): wrapped lwip_chksum()={0} \n", acc);*/
 			}
 
-			if (swapped != 0)
-			{
+			if (swapped != 0) {
 				acc = SWAP_BYTES_IN_WORD((ushort)acc);
 			}
 			addr = ip_addr.ip4_addr_get_u32(src);
@@ -438,19 +428,16 @@ namespace uITron3
 
 			acc = 0;
 			swapped = 0;
-			for (q = p; q != null; q = q.next)
-			{
+			for (q = p; q != null; q = q.next) {
 				acc += LWIP_CHKSUM(q.payload, q.len);
 				acc = FOLD_U32T(acc);
-				if (q.len % 2 != 0)
-				{
+				if (q.len % 2 != 0) {
 					swapped = (byte)(1 - swapped);
 					acc = SWAP_BYTES_IN_WORD((ushort)acc);
 				}
 			}
 
-			if (swapped != 0)
-			{
+			if (swapped != 0) {
 				acc = SWAP_BYTES_IN_WORD((ushort)acc);
 			}
 			return (ushort)~(acc & 0xffffUL);
@@ -477,6 +464,51 @@ namespace uITron3
 		private static ushort LWIP_CHKSUM(pointer dst, ushort len)
 		{
 			return lwip_standard_chksum(dst, len);
+		}
+
+		public static ushort inet6_chksum_pseudo(pbuf p, ip6_addr src, ip6_addr dest, byte proto, ushort proto_len)
+		{
+			uint acc;
+			pbuf q;
+			byte swapped;
+
+			acc = 0;
+			swapped = 0;
+			/* iterate through all pbuf in chain */
+			for (q = p; q != null; q = q.next) {
+				lwip.LWIP_DEBUGF(opt.INET_DEBUG, "_inet_chksum.inet_chksum_pseudo(): checksumming pbuf {0} (has next {1}) \n",
+					q.GetHashCode(), q.next == null ? 0 : q.next.GetHashCode());
+				acc += LWIP_CHKSUM(q, q.len);
+				/*lwip.LWIP_DEBUGF(opt.INET_DEBUG, "_inet_chksum.inet_chksum_pseudo(): unwrapped lwip_chksum()={0} \n", acc);*/
+				/* just executing this next line is probably faster that the if statement needed
+				   to check whether we really need to execute it, and does no harm */
+				acc = FOLD_U32T(acc);
+				if (q.len % 2 != 0) {
+					swapped = (byte)(1 - swapped);
+					acc = SWAP_BYTES_IN_WORD((ushort)acc);
+				}
+				/*lwip.LWIP_DEBUGF(opt.INET_DEBUG, "_inet_chksum.inet_chksum_pseudo(): wrapped lwip_chksum()={0} \n", acc);*/
+			}
+
+			if (swapped != 0) {
+				acc = SWAP_BYTES_IN_WORD((ushort)acc);
+			}
+			for (int i = 0; i < 8; i++) {
+				acc += lwip_htons(src.saddr[i]);
+				acc += lwip_htons(dest.saddr[i]);
+				while ((acc >> 16) != 0) {
+					acc = (acc & 0xffff) + (acc >> 16);
+				}
+			}
+			acc += (uint)lwip_htons((ushort)proto);
+			acc += (uint)lwip_htons(proto_len);
+
+			/* Fold 32-bit sum to 16 bits
+			   calling this twice is propably faster than if statements... */
+			acc = FOLD_U32T(acc);
+			acc = FOLD_U32T(acc);
+			lwip.LWIP_DEBUGF(opt.INET_DEBUG, "_inet_chksum.inet_chksum_pseudo(): pbuf chain lwip_chksum()={0}\n", acc);
+			return (ushort)~(acc & 0xffffU);
 		}
 	}
 }

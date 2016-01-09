@@ -220,8 +220,7 @@ namespace uITron3
 
 		public static void TCP_EVENT_ACCEPT(tcp_pcb pcb, err_t err, out err_t ret)
 		{
-			do
-			{
+			do {
 				if (pcb.accept != null)
 					ret = pcb.accept(pcb.callback_arg, pcb, err);
 				else ret = err_t.ERR_ARG;
@@ -230,8 +229,7 @@ namespace uITron3
 
 		public static void TCP_EVENT_SENT(tcp_pcb pcb, ushort space, out err_t ret)
 		{
-			do
-			{
+			do {
 				if (pcb.sent != null)
 					ret = pcb.sent(pcb.callback_arg, pcb, space);
 				else ret = err_t.ERR_OK;
@@ -240,14 +238,11 @@ namespace uITron3
 
 		public void TCP_EVENT_RECV(tcp_pcb pcb, pbuf p, err_t err, out err_t ret)
 		{
-			do
-			{
-				if (pcb.recv != null)
-				{
+			do {
+				if (pcb.recv != null) {
 					ret = pcb.recv(pcb.callback_arg, pcb, p, err);
 				}
-				else
-				{
+				else {
 					ret = tcp_recv_null(null, pcb, p, err);
 				}
 			} while (false);
@@ -255,14 +250,11 @@ namespace uITron3
 
 		public static void TCP_EVENT_CLOSED(tcp_pcb pcb, out err_t ret)
 		{
-			do
-			{
-				if ((pcb.recv != null))
-				{
+			do {
+				if ((pcb.recv != null)) {
 					ret = pcb.recv(pcb.callback_arg, pcb, null, err_t.ERR_OK);
 				}
-				else
-				{
+				else {
 					ret = err_t.ERR_OK;
 				}
 			} while (false);
@@ -270,8 +262,7 @@ namespace uITron3
 
 		public static void TCP_EVENT_CONNECTED(tcp_pcb pcb, err_t err, out err_t ret)
 		{
-			do
-			{
+			do {
 				if (pcb.connected != null)
 					ret = pcb.connected(pcb.callback_arg, pcb, err);
 				else ret = err_t.ERR_OK;
@@ -280,8 +271,7 @@ namespace uITron3
 
 		public static void TCP_EVENT_POLL(tcp_pcb pcb, out err_t ret)
 		{
-			do
-			{
+			do {
 				if (pcb.poll != null)
 					ret = pcb.poll(pcb.callback_arg, pcb);
 				else ret = err_t.ERR_OK;
@@ -290,8 +280,7 @@ namespace uITron3
 
 		public static void TCP_EVENT_ERR(tcp_err_fn errf, object arg, err_t err)
 		{
-			do
-			{
+			do {
 				if (errf != null)
 					errf(arg, err);
 			} while (false);
@@ -366,9 +355,8 @@ namespace uITron3
 	/* The TCP PCB lists. */
 	public class tcp_listen_pcbs_t
 	{ /* List of all TCP PCBs in tcp_state.LISTEN state. */
-		private object union;
-		public tcp_pcb_listen listen_pcbs { get { return (tcp_pcb_listen)union; } set { union = value; } }
-		public tcp_pcb_common pcbs { get { return (tcp_pcb_common)union; } set { union = value; } }
+		public tcp_pcb_common pcbs;
+		public tcp_pcb_listen listen_pcbs { get { return (tcp_pcb_listen)pcbs; } set { pcbs = value; } }
 	}
 
 	public partial class tcp
@@ -385,15 +373,13 @@ namespace uITron3
 		public const int TCP_DEBUG_PCB_LISTS = 0;
 #endif
 #if TCP_DEBUG_PCB_LISTS
-		public void TCP_REG(ref tcp_pcb_common pcbs, tcp_pcb_common npcb)
+		public void TCP_REG<T>(ref T pcbs, T npcb) where T : tcp_pcb_common
 		{
-			do
-			{
+			do {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP_REG {0} local port {1}\n", (npcb), (npcb).local_port);
 				for (tcp_tmp_pcb = (pcbs);
 					tcp_tmp_pcb != null;
-					tcp_tmp_pcb = tcp_tmp_pcb.next)
-				{
+					tcp_tmp_pcb = tcp_tmp_pcb.next) {
 					lwip.LWIP_ASSERT("TCP_REG: already registered\n", tcp_tmp_pcb != (npcb));
 				}
 				lwip.LWIP_ASSERT("TCP_REG: pcb.state != tcp_state.CLOSED", ((pcbs) == tcp_bound_pcbs) || ((npcb).state != tcp_state.CLOSED));
@@ -401,25 +387,21 @@ namespace uITron3
 				lwip.LWIP_ASSERT("TCP_REG: npcb.next != npcb", (npcb).next != (npcb));
 				pcbs = (npcb);
 				lwip.LWIP_ASSERT("TCP_RMV: tcp_pcbs sane", tcp_pcbs_sane() != 0);
-				sys.tcp_timer_needed();
+				lwip.sys.tcp_timer_needed();
 			} while (false);
 		}
 
-		public void TCP_RMV(ref tcp_pcb_common pcbs, tcp_pcb_common npcb)
+		public void TCP_RMV<T>(ref T pcbs, T npcb) where T : tcp_pcb_common
 		{
-			do
-			{
+			do {
 				lwip.LWIP_ASSERT("TCP_RMV: pcbs != null", pcbs != null);
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "TCP_RMV: removing {0} from {1}\n", npcb, pcbs);
-				if (pcbs == npcb)
-				{
-					pcbs = (pcbs).next;
+				if (pcbs == npcb) {
+					pcbs = (T)(pcbs).next;
 				}
 				else
-					for (tcp_tmp_pcb = pcbs; tcp_tmp_pcb != null; tcp_tmp_pcb = tcp_tmp_pcb.next)
-					{
-						if (tcp_tmp_pcb.next == npcb)
-						{
+					for (tcp_tmp_pcb = pcbs; tcp_tmp_pcb != null; tcp_tmp_pcb = tcp_tmp_pcb.next) {
+						if (tcp_tmp_pcb.next == npcb) {
 							tcp_tmp_pcb.next = npcb.next;
 							break;
 						}
@@ -432,7 +414,7 @@ namespace uITron3
 
 #else // LWIP_DEBUG
 
-		public void TCP_REG(ref tcp_pcb_common pcbs, tcp_pcb_common npcb)
+		public void TCP_REG<T>(ref T pcbs, T npcb) where T : tcp_pcb_common
 		{
 			do
 			{
@@ -442,13 +424,13 @@ namespace uITron3
 			} while (false);
 		}
 
-		public void TCP_RMV(ref tcp_pcb_common pcbs, tcp_pcb_common npcb)
+		public void TCP_RMV<T>(ref T pcbs, T npcb) where T : tcp_pcb_common
 		{
 			do
 			{
 				if (pcbs == (npcb))
 				{
-					pcbs = (pcbs).next;
+					pcbs = (T)(pcbs).next;
 				}
 				else
 				{
@@ -471,30 +453,23 @@ namespace uITron3
 
 		public void TCP_REG_ACTIVE(tcp_pcb npcb)
 		{
-			do
-			{
-				tcp_pcb_common temp = tcp_active_pcbs;
-				TCP_REG(ref temp, npcb);
-				tcp_active_pcbs = (tcp_pcb)temp;
+			do {
+				TCP_REG(ref tcp_active_pcbs, npcb);
 				tcp_active_pcbs_changed = 1;
 			} while (false);
 		}
 
 		public void TCP_RMV_ACTIVE(tcp_pcb npcb)
 		{
-			do
-			{
-				tcp_pcb_common temp = tcp_active_pcbs;
-				TCP_RMV(ref temp, npcb);
-				tcp_active_pcbs = (tcp_pcb)temp;
+			do {
+				TCP_RMV(ref tcp_active_pcbs, npcb);
 				tcp_active_pcbs_changed = 1;
 			} while (false);
 		}
 
 		public void TCP_PCB_REMOVE_ACTIVE(tcp_pcb_common pcb)
 		{
-			do
-			{
+			do {
 				tcp_pcb_remove(tcp_active_pcbs, pcb);
 				tcp_active_pcbs_changed = 1;
 			} while (false);
@@ -505,15 +480,12 @@ namespace uITron3
 
 		public static void tcp_ack(tcp_pcb pcb)
 		{
-			do
-			{
-				if ((pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0)
-				{
+			do {
+				if ((pcb.flags & tcp_pcb.TF_ACK_DELAY) != 0) {
 					pcb.flags &= unchecked((byte)~tcp_pcb.TF_ACK_DELAY);
 					pcb.flags |= tcp_pcb.TF_ACK_NOW;
 				}
-				else
-				{
+				else {
 					pcb.flags |= tcp_pcb.TF_ACK_DELAY;
 				}
 			} while (false);
@@ -521,8 +493,7 @@ namespace uITron3
 
 		public static void tcp_ack_now(tcp_pcb pcb)
 		{
-			do
-			{
+			do {
 				pcb.flags |= tcp_pcb.TF_ACK_NOW;
 			} while (false);
 		}

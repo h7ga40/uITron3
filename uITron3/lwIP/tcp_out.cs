@@ -54,8 +54,7 @@ namespace uITron3
 #if TCP_CHECKSUM_ON_COPY
 		public static void TCP_DATA_COPY(pointer dst, pointer src, ushort len, tcp_seg seg)
 		{
-			do
-			{
+			do {
 				tcp_seg_add_chksum(lwip.LWIP_CHKSUM_COPY(dst, src, len),
 					len, ref seg.chksum, ref seg.chksum_swapped);
 				seg.flags |= tcp_seg.TF_SEG_DATA_CHECKSUMMED;
@@ -92,8 +91,7 @@ namespace uITron3
 		{
 			tcp_hdr tcphdr;
 			pbuf p = lwip.pbuf_alloc(pbuf_layer.PBUF_IP, (ushort)(tcp.TCP_HLEN + optlen + datalen), pbuf_type.PBUF_RAM);
-			if (p != null)
-			{
+			if (p != null) {
 				lwip.LWIP_ASSERT("check that first pbuf can hold tcp_hdr",
 							 (p.len >= tcp.TCP_HLEN + optlen));
 				tcphdr = new tcp_hdr(p.payload);
@@ -121,15 +119,13 @@ namespace uITron3
 		public err_t tcp_send_fin(tcp_pcb pcb)
 		{
 			/* first, try to add the fin to the last unsent segment */
-			if (pcb.unsent != null)
-			{
+			if (pcb.unsent != null) {
 				tcp_seg last_unsent;
 				for (last_unsent = pcb.unsent; last_unsent.next != null;
 					 last_unsent = last_unsent.next)
 					;
 
-				if ((tcp_hdr.TCPH_FLAGS(last_unsent.tcphdr) & (tcp.TCP_SYN | tcp.TCP_FIN | tcp.TCP_RST)) == 0)
-				{
+				if ((tcp_hdr.TCPH_FLAGS(last_unsent.tcphdr) & (tcp.TCP_SYN | tcp.TCP_FIN | tcp.TCP_RST)) == 0) {
 					/* no SYN/FIN/RST flag in the header, we can add the FIN flag */
 					tcp_hdr.TCPH_SET_FLAG(last_unsent.tcphdr, tcp.TCP_FIN);
 					pcb.flags |= tcp_pcb.TF_FIN;
@@ -159,8 +155,7 @@ namespace uITron3
 			tcp_seg seg;
 			byte optlen = (byte)tcp_seg.LWIP_TCP_OPT_LENGTH(optflags);
 
-			if ((seg = (tcp_seg)lwip.memp_malloc(memp_t.MEMP_TCP_SEG)) == null)
-			{
+			if ((seg = (tcp_seg)lwip.memp_malloc(memp_t.MEMP_TCP_SEG)) == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2, "tcp_create_segment: no memory.\n");
 				lwip.pbuf_free(p);
 				return null;
@@ -181,8 +176,7 @@ namespace uITron3
 #endif // TCP_CHECKSUM_ON_COPY
 
 			/* build TCP header */
-			if (lwip.pbuf_header(p, tcp.TCP_HLEN) != 0)
-			{
+			if (lwip.pbuf_header(p, TCP_HLEN) != 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2, "tcp_create_segment: no room for TCP header in pbuf.\n");
 				++lwip.lwip_stats.tcp.err;
 				tcp_seg_free(seg);
@@ -254,8 +248,7 @@ namespace uITron3
 			}
 #endif // LWIP_NETIF_TX_SINGLE_PBUF
 			p = lwip.pbuf_alloc(layer, alloc, pbuf_type.PBUF_RAM);
-			if (p == null)
-			{
+			if (p == null) {
 				return null;
 			}
 			lwip.LWIP_ASSERT("need unchained pbuf", p.next == null);
@@ -283,8 +276,7 @@ namespace uITron3
 			/* add chksum to old chksum and fold to ushort */
 			helper = (uint)(chksum + seg_chksum);
 			chksum = (ushort)lwip.FOLD_U32T(helper);
-			if ((len & 1) != 0)
-			{
+			if ((len & 1) != 0) {
 				seg_chksum_swapped = !seg_chksum_swapped;
 				chksum = lwip.SWAP_BYTES_IN_WORD(chksum);
 			}
@@ -304,19 +296,16 @@ namespace uITron3
 			if ((pcb.state != tcp_state.ESTABLISHED) &&
 				(pcb.state != tcp_state.CLOSE_WAIT) &&
 				(pcb.state != tcp_state.SYN_SENT) &&
-				(pcb.state != tcp_state.SYN_RCVD))
-			{
+				(pcb.state != tcp_state.SYN_RCVD)) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | lwip.LWIP_DBG_STATE | lwip.LWIP_DBG_LEVEL_SEVERE, "tcp_write() called in invalid state\n");
 				return err_t.ERR_CONN;
 			}
-			else if (len == 0)
-			{
+			else if (len == 0) {
 				return err_t.ERR_OK;
 			}
 
 			/* fail on too much data */
-			if (len > pcb.snd_buf)
-			{
+			if (len > pcb.snd_buf) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 3, "tcp_write: too much data (len={0} > snd_buf={1})\n",
 				  len, pcb.snd_buf);
 				pcb.flags |= tcp_pcb.TF_NAGLEMEMERR;
@@ -328,21 +317,18 @@ namespace uITron3
 			/* If total number of pbufs on the unsent/unacked queues exceeds the
 			 * configured maximum, return an error */
 			/* check for configured max queuelen and possible overflow */
-			if ((pcb.snd_queuelen >= opt.TCP_SND_QUEUELEN) || (pcb.snd_queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW))
-			{
+			if ((pcb.snd_queuelen >= opt.TCP_SND_QUEUELEN) || (pcb.snd_queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW)) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 3, "tcp_write: too long queue {0} (max {1})\n",
 				  pcb.snd_queuelen, opt.TCP_SND_QUEUELEN);
 				++lwip.lwip_stats.tcp.memerr;
 				pcb.flags |= tcp_pcb.TF_NAGLEMEMERR;
 				return err_t.ERR_MEM;
 			}
-			if (pcb.snd_queuelen != 0)
-			{
+			if (pcb.snd_queuelen != 0) {
 				lwip.LWIP_ASSERT("tcp_write: pbufs on queue => at least one queue non-empty",
 				  pcb.unacked != null || pcb.unsent != null);
 			}
-			else
-			{
+			else {
 				lwip.LWIP_ASSERT("tcp_write: no pbufs on queue => both queues empty",
 				  pcb.unacked == null && pcb.unsent == null);
 			}
@@ -398,15 +384,13 @@ namespace uITron3
 				return err_t.ERR_ARG;
 
 			err = tcp_write_checks(pcb, len);
-			if (err != err_t.ERR_OK)
-			{
+			if (err != err_t.ERR_OK) {
 				return err;
 			}
 			queuelen = pcb.snd_queuelen;
 
 #if LWIP_TCP_TIMESTAMPS
-			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0)
-			{
+			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0) {
 				optflags = tcp_seg.TF_SEG_OPTS_TS;
 				optlen = (byte)tcp_seg.LWIP_TCP_OPT_LENGTH(tcp_seg.TF_SEG_OPTS_TS);
 			}
@@ -436,8 +420,7 @@ namespace uITron3
 			 */
 
 			/* Find the tail of the unsent queue. */
-			if (pcb.unsent != null)
-			{
+			if (pcb.unsent != null) {
 				ushort space;
 				ushort unsent_optlen;
 
@@ -464,8 +447,7 @@ namespace uITron3
 							pcb.unsent_oversize == last_unsent.oversize_left);
 #endif // TCP_OVERSIZE_DBGCHECK
 				oversize = pcb.unsent_oversize;
-				if (oversize > 0)
-				{
+				if (oversize > 0) {
 					lwip.LWIP_ASSERT("inconsistent oversize vs. space", oversize_used <= space);
 					seg = last_unsent;
 					oversize_used = oversize < len ? oversize : len;
@@ -484,8 +466,7 @@ namespace uITron3
 				 * (len==0). The new pbuf is kept in concat_p and pbuf_cat'ed at
 				 * the end.
 				 */
-				if ((pos < len) && (space > 0) && (last_unsent.len > 0))
-				{
+				if ((pos < len) && (space > 0) && (last_unsent.len > 0)) {
 					ushort seglen = (ushort)(space < len - pos ? space : len - pos);
 					//ushort oversize;
 					//ushort concat_chksum = 0;
@@ -495,11 +476,9 @@ namespace uITron3
 					/* Create a pbuf with a copy or reference to seglen bytes. We
 					 * can use pbuf_layer.PBUF_RAW here since the data appears in the middle of
 					 * a segment. A header will never be prepended. */
-					if ((apiflags & tcp.TCP_WRITE_FLAG_COPY) != 0)
-					{
+					if ((apiflags & tcp.TCP_WRITE_FLAG_COPY) != 0) {
 						/* Data is copied */
-						if ((concat_p = tcp_pbuf_prealloc(pbuf_layer.PBUF_RAW, seglen, space, ref oversize, pcb, apiflags, 1)) == null)
-						{
+						if ((concat_p = tcp_pbuf_prealloc(pbuf_layer.PBUF_RAW, seglen, space, ref oversize, pcb, apiflags, 1)) == null) {
 							lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2,
 										"tcp_write : could not allocate memory for pbuf copy size {0}\n",
 										 seglen);
@@ -513,11 +492,9 @@ namespace uITron3
 						concat_chksummed += seglen;
 #endif // TCP_CHECKSUM_ON_COPY
 					}
-					else
-					{
+					else {
 						/* Data is not copied */
-						if ((concat_p = lwip.pbuf_alloc(pbuf_layer.PBUF_RAW, seglen, pbuf_type.PBUF_ROM)) == null)
-						{
+						if ((concat_p = lwip.pbuf_alloc(pbuf_layer.PBUF_RAW, seglen, pbuf_type.PBUF_ROM)) == null) {
 							lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2,
 										("tcp_write: could not allocate memory for zero-copy pbuf\n"));
 							goto memerr;
@@ -536,8 +513,7 @@ namespace uITron3
 					queuelen += lwip.pbuf_clen(concat_p);
 				}
 			}
-			else
-			{
+			else {
 #if TCP_OVERSIZE
 				lwip.LWIP_ASSERT("unsent_oversize mismatch (pcb.unsent is null)",
 							pcb.unsent_oversize == 0);
@@ -550,8 +526,7 @@ namespace uITron3
 			 * The new segments are chained together in the local 'queue'
 			 * variable, ready to be appended to pcb.unsent.
 			 */
-			while (pos < len)
-			{
+			while (pos < len) {
 				pbuf p;
 				ushort left = (ushort)(len - pos);
 				ushort max_len = (ushort)(mss_local - optlen);
@@ -560,12 +535,10 @@ namespace uITron3
 				ushort chksum = 0;
 				bool chksum_swapped = false;
 
-				if ((apiflags & tcp.TCP_WRITE_FLAG_COPY) != 0)
-				{
+				if ((apiflags & tcp.TCP_WRITE_FLAG_COPY) != 0) {
 					/* If copy is set, memory should be allocated and data copied
 					 * into pbuf */
-					if ((p = tcp_pbuf_prealloc(pbuf_layer.PBUF_TRANSPORT, (ushort)(seglen + optlen), mss_local, ref oversize, pcb, apiflags, (byte)(queue == null ? 1 : 0))) == null)
-					{
+					if ((p = tcp_pbuf_prealloc(pbuf_layer.PBUF_TRANSPORT, (ushort)(seglen + optlen), mss_local, ref oversize, pcb, apiflags, (byte)(queue == null ? 1 : 0))) == null) {
 						lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2, "tcp_write : could not allocate memory for pbuf copy size {0}\n", seglen);
 						goto memerr;
 					}
@@ -573,8 +546,7 @@ namespace uITron3
 								(p.len >= seglen));
 					TCP_DATA_COPY2(p.payload + optlen, arg + pos, seglen, ref chksum, ref chksum_swapped);
 				}
-				else
-				{
+				else {
 					/* Copy is not set: First allocate a pbuf for holding the data.
 					 * Since the referenced data is available at least until it is
 					 * sent out on the link (as it has to be ACKed by the remote
@@ -584,8 +556,7 @@ namespace uITron3
 #if TCP_OVERSIZE
 					lwip.LWIP_ASSERT("oversize == 0", oversize == 0);
 #endif // TCP_OVERSIZE
-					if ((p2 = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, seglen, pbuf_type.PBUF_ROM)) == null)
-					{
+					if ((p2 = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, seglen, pbuf_type.PBUF_ROM)) == null) {
 						lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2, "tcp_write: could not allocate memory for zero-copy pbuf\n");
 						goto memerr;
 					}
@@ -597,8 +568,7 @@ namespace uITron3
 					p2.payload = arg + pos;
 
 					/* Second, allocate a pbuf for the headers. */
-					if ((p = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, optlen, pbuf_type.PBUF_RAM)) == null)
-					{
+					if ((p = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, optlen, pbuf_type.PBUF_RAM)) == null) {
 						/* If allocation fails, we have to deallocate the data pbuf as
 						 * well. */
 						lwip.pbuf_free(p2);
@@ -614,15 +584,13 @@ namespace uITron3
 				/* Now that there are more segments queued, we check again if the
 				 * length of the queue exceeds the configured maximum or
 				 * overflows. */
-				if ((queuelen > opt.TCP_SND_QUEUELEN) || (queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW))
-				{
+				if ((queuelen > opt.TCP_SND_QUEUELEN) || (queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW)) {
 					lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 2, "tcp_write: queue too long {0} ({1})\n", queuelen, opt.TCP_SND_QUEUELEN);
 					lwip.pbuf_free(p);
 					goto memerr;
 				}
 
-				if ((seg = tcp_create_segment(pcb, p, 0, pcb.snd_lbb + pos, optflags)) == null)
-				{
+				if ((seg = tcp_create_segment(pcb, p, 0, pcb.snd_lbb + pos, optflags)) == null) {
 					goto memerr;
 				}
 #if TCP_OVERSIZE_DBGCHECK
@@ -635,12 +603,10 @@ namespace uITron3
 #endif // TCP_CHECKSUM_ON_COPY
 
 				/* first segment of to-be-queued data? */
-				if (queue == null)
-				{
+				if (queue == null) {
 					queue = seg;
 				}
-				else
-				{
+				else {
 					/* Attach the segment to the end of the queued segments */
 					lwip.LWIP_ASSERT("prev_seg != null", prev_seg != null);
 					prev_seg.next = seg;
@@ -665,15 +631,12 @@ namespace uITron3
 			 * last_unsent, we update the length fields of the pbuf chain.
 			 */
 #if TCP_OVERSIZE
-			if (oversize_used > 0)
-			{
+			if (oversize_used > 0) {
 				pbuf p;
 				/* Bump tot_len of whole chain, len of tail */
-				for (p = last_unsent.p; p != null; p = p.next)
-				{
+				for (p = last_unsent.p; p != null; p = p.next) {
 					p.tot_len += oversize_used;
-					if (p.next == null)
-					{
+					if (p.next == null) {
 						TCP_DATA_COPY(new pointer(p.payload.data, p.payload.offset + p.len), arg, oversize_used, last_unsent);
 						p.len += oversize_used;
 					}
@@ -691,15 +654,13 @@ namespace uITron3
 			/*
 			 * Phase 2: concat_p can be concatenated onto last_unsent.p
 			 */
-			if (concat_p != null)
-			{
+			if (concat_p != null) {
 				lwip.LWIP_ASSERT("tcp_write: cannot concatenate when pcb.unsent is empty",
 				  (last_unsent != null));
 				lwip.pbuf_cat(last_unsent.p, concat_p);
 				last_unsent.len += concat_p.tot_len;
 #if TCP_CHECKSUM_ON_COPY
-				if (concat_chksummed != 0)
-				{
+				if (concat_chksummed != 0) {
 					tcp_seg_add_chksum(concat_chksum, concat_chksummed, ref last_unsent.chksum,
 					  ref last_unsent.chksum_swapped);
 					last_unsent.flags |= tcp_seg.TF_SEG_DATA_CHECKSUMMED;
@@ -711,12 +672,10 @@ namespace uITron3
 			 * Phase 3: Append queue to pcb.unsent. Queue may be null, but that
 			 * is harmless
 			 */
-			if (last_unsent == null)
-			{
+			if (last_unsent == null) {
 				pcb.unsent = queue;
 			}
-			else
-			{
+			else {
 				last_unsent.next = queue;
 			}
 
@@ -729,15 +688,13 @@ namespace uITron3
 
 			lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_write: {0} (after enqueued)\n",
 			  pcb.snd_queuelen);
-			if (pcb.snd_queuelen != 0)
-			{
+			if (pcb.snd_queuelen != 0) {
 				lwip.LWIP_ASSERT("tcp_write: valid queue length",
 							pcb.unacked != null || pcb.unsent != null);
 			}
 
 			/* Set the PSH flag in the last segment that we enqueued. */
-			if (seg != null && seg.tcphdr != null && ((apiflags & tcp.TCP_WRITE_FLAG_MORE) == 0))
-			{
+			if (seg != null && seg.tcphdr != null && ((apiflags & tcp.TCP_WRITE_FLAG_MORE) == 0)) {
 				tcp_hdr.TCPH_SET_FLAG(seg.tcphdr, tcp.TCP_PSH);
 			}
 
@@ -746,16 +703,13 @@ namespace uITron3
 			pcb.flags |= tcp_pcb.TF_NAGLEMEMERR;
 			++lwip.lwip_stats.tcp.memerr;
 
-			if (concat_p != null)
-			{
+			if (concat_p != null) {
 				lwip.pbuf_free(concat_p);
 			}
-			if (queue != null)
-			{
+			if (queue != null) {
 				tcp_segs_free(queue);
 			}
-			if (pcb.snd_queuelen != 0)
-			{
+			if (pcb.snd_queuelen != 0) {
 				lwip.LWIP_ASSERT("tcp_write: valid queue length", pcb.unacked != null ||
 				  pcb.unsent != null);
 			}
@@ -786,8 +740,7 @@ namespace uITron3
 						(flags & (tcp.TCP_SYN | tcp.TCP_FIN)) != 0);
 
 			/* check for configured max queuelen and possible overflow */
-			if ((pcb.snd_queuelen >= opt.TCP_SND_QUEUELEN) || (pcb.snd_queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW))
-			{
+			if ((pcb.snd_queuelen >= opt.TCP_SND_QUEUELEN) || (pcb.snd_queuelen > tcp_pcb.TCP_SNDQUEUELEN_OVERFLOW)) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 3, "tcp_enqueue_flags: too long queue {0} (max {1})\n",
 												   pcb.snd_queuelen, opt.TCP_SND_QUEUELEN);
 				++lwip.lwip_stats.tcp.memerr;
@@ -795,13 +748,11 @@ namespace uITron3
 				return err_t.ERR_MEM;
 			}
 
-			if ((flags & tcp.TCP_SYN) != 0)
-			{
+			if ((flags & tcp.TCP_SYN) != 0) {
 				optflags = tcp_seg.TF_SEG_OPTS_MSS;
 			}
 #if LWIP_TCP_TIMESTAMPS
-			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0)
-			{
+			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0) {
 				optflags |= tcp_seg.TF_SEG_OPTS_TS;
 			}
 #endif // LWIP_TCP_TIMESTAMPS
@@ -811,16 +762,14 @@ namespace uITron3
 			 * We need one available snd_buf byte to do that.
 			 * This means we can't send FIN while snd_buf==0. A better fix would be to
 			 * not include SYN and FIN sequence numbers in the snd_buf count. */
-			if (pcb.snd_buf == 0)
-			{
+			if (pcb.snd_buf == 0) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG | 3, "tcp_enqueue_flags: no send buffer available\n");
 				++lwip.lwip_stats.tcp.memerr;
 				return err_t.ERR_MEM;
 			}
 
 			/* Allocate pbuf with room for TCP header + options */
-			if ((p = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, optlen, pbuf_type.PBUF_RAM)) == null)
-			{
+			if ((p = lwip.pbuf_alloc(pbuf_layer.PBUF_TRANSPORT, optlen, pbuf_type.PBUF_RAM)) == null) {
 				pcb.flags |= tcp_pcb.TF_NAGLEMEMERR;
 				++lwip.lwip_stats.tcp.memerr;
 				return err_t.ERR_MEM;
@@ -829,8 +778,7 @@ namespace uITron3
 						(p.len >= optlen));
 
 			/* Allocate memory for tcp_seg, and fill in fields. */
-			if ((seg = tcp_create_segment(pcb, p, flags, pcb.snd_lbb, optflags)) == null)
-			{
+			if ((seg = tcp_create_segment(pcb, p, flags, pcb.snd_lbb, optflags)) == null) {
 				pcb.flags |= tcp_pcb.TF_NAGLEMEMERR;
 				++lwip.lwip_stats.tcp.memerr;
 				return err_t.ERR_MEM;
@@ -845,12 +793,10 @@ namespace uITron3
 						 (ushort)flags);
 
 			/* Now append seg to pcb.unsent queue */
-			if (pcb.unsent == null)
-			{
+			if (pcb.unsent == null) {
 				pcb.unsent = seg;
 			}
-			else
-			{
+			else {
 				tcp_seg useg;
 				for (useg = pcb.unsent; useg.next != null; useg = useg.next) ;
 				useg.next = seg;
@@ -861,22 +807,19 @@ namespace uITron3
 #endif // TCP_OVERSIZE
 
 			/* SYN and FIN bump the sequence number */
-			if ((flags & tcp.TCP_SYN) != 0 || (flags & tcp.TCP_FIN) != 0)
-			{
+			if ((flags & tcp.TCP_SYN) != 0 || (flags & tcp.TCP_FIN) != 0) {
 				pcb.snd_lbb++;
 				/* optlen does not influence snd_buf */
 				pcb.snd_buf--;
 			}
-			if ((flags & tcp.TCP_FIN) != 0)
-			{
+			if ((flags & tcp.TCP_FIN) != 0) {
 				pcb.flags |= tcp_pcb.TF_FIN;
 			}
 
 			/* update number of segments on the queues */
 			pcb.snd_queuelen += lwip.pbuf_clen(seg.p);
 			lwip.LWIP_DEBUGF(opt.TCP_QLEN_DEBUG, "tcp_enqueue_flags: {0} (after enqueued)\n", pcb.snd_queuelen);
-			if (pcb.snd_queuelen != 0)
-			{
+			if (pcb.snd_queuelen != 0) {
 				lwip.LWIP_ASSERT("tcp_enqueue_flags: invalid queue length",
 				  pcb.unacked != null || pcb.unsent != null);
 			}
@@ -890,12 +833,12 @@ namespace uITron3
 		 * @param pcb tcp_pcb
 		 * @param opts option pointer where to store the timestamp option
 		 */
-		private static void tcp_build_timestamp_option(tcp_pcb pcb, pointer opts)
+		private void tcp_build_timestamp_option(tcp_pcb pcb, pointer opts)
 		{
 			/* Pad with two NOP options to make everything nicely aligned */
 			opts.SetValue((uint)lwip.PP_HTONL(0x0101080A));
 			opts += sizeof(uint);
-			opts.SetValue((uint)lwip.lwip_htonl((uint)sys.sys_now()));
+			opts.SetValue((uint)lwip.lwip_htonl(lwip.sys.sys_now()));
 			opts += sizeof(uint);
 			opts.SetValue((uint)lwip.lwip_htonl(pcb.ts_recent));
 		}
@@ -912,15 +855,13 @@ namespace uITron3
 			byte optlen = 0;
 
 #if LWIP_TCP_TIMESTAMPS
-			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0)
-			{
+			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0) {
 				optlen = (byte)tcp_seg.LWIP_TCP_OPT_LENGTH(tcp_seg.TF_SEG_OPTS_TS);
 			}
 #endif
 
 			p = tcp_output_alloc_header(pcb, optlen, 0, lwip.lwip_htonl(pcb.snd_nxt));
-			if (p == null)
-			{
+			if (p == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG, "tcp_output: (ACK) could not allocate pbuf\n");
 				return err_t.ERR_BUF;
 			}
@@ -934,8 +875,7 @@ namespace uITron3
 #if LWIP_TCP_TIMESTAMPS
 			pcb.ts_lastacksent = pcb.rcv_nxt;
 
-			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0)
-			{
+			if ((pcb.flags & tcp_pcb.TF_TIMESTAMP) != 0) {
 				tcp_build_timestamp_option(pcb, new pointer(tcphdr.data, tcphdr.offset + tcp_hdr.length));
 			}
 #endif
@@ -979,8 +919,7 @@ namespace uITron3
 			   code. If so, we do not output anything. Instead, we rely on the
 			   input processing code to call us when input processing is done
 			   with. */
-			if (lwip.tcp.tcp_input_pcb == pcb)
-			{
+			if (lwip.tcp.tcp_input_pcb == pcb) {
 				return err_t.ERR_OK;
 			}
 
@@ -996,35 +935,30 @@ namespace uITron3
 			 */
 			if ((pcb.flags & tcp_pcb.TF_ACK_NOW) != 0 &&
 			   (seg == null ||
-				lwip.lwip_ntohl(seg.tcphdr.seqno) - pcb.lastack + seg.len > wnd))
-			{
+				lwip.lwip_ntohl(seg.tcphdr.seqno) - pcb.lastack + seg.len > wnd)) {
 				return tcp_send_empty_ack(pcb);
 			}
 
 			/* useg should point to last segment on unacked queue */
 			useg = pcb.unacked;
-			if (useg != null)
-			{
+			if (useg != null) {
 				for (; useg.next != null; useg = useg.next) ;
 			}
 
 #if TCP_OUTPUT_DEBUG
-			if (seg == null)
-			{
+			if (seg == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_OUTPUT_DEBUG, "tcp_output: nothing to send ({0})\n",
 											   pcb.unsent);
 			}
 #endif // TCP_OUTPUT_DEBUG
 #if TCP_CWND_DEBUG
-			if (seg == null)
-			{
+			if (seg == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_CWND_DEBUG, "tcp_output: snd_wnd {0}"
 											 + ", cwnd {1}, wnd {2}"
 											 + ", seg == null, ack {3}\n",
 											 pcb.snd_wnd, pcb.cwnd, wnd, pcb.lastack);
 			}
-			else
-			{
+			else {
 				lwip.LWIP_DEBUGF(opt.TCP_CWND_DEBUG,
 							"tcp_output: snd_wnd {0}, cwnd {1}, wnd {2}"
 							 + ", effwnd {3}, seq {4}, ack {5}\n",
@@ -1035,8 +969,7 @@ namespace uITron3
 #endif // TCP_CWND_DEBUG
 			/* data available and window allows it to be sent? */
 			while (seg != null &&
-				   lwip.lwip_ntohl(seg.tcphdr.seqno) - pcb.lastack + seg.len <= wnd)
-			{
+				   lwip.lwip_ntohl(seg.tcphdr.seqno) - pcb.lastack + seg.len <= wnd) {
 				lwip.LWIP_ASSERT("RST not expected here!",
 							(tcp_hdr.TCPH_FLAGS(seg.tcphdr) & tcp.TCP_RST) == 0);
 				/* Stop sending if the nagle algorithm would prevent it
@@ -1047,8 +980,7 @@ namespace uITron3
 				 *   RST is no sent using tcp_write/tcp.tcp_output.
 				 */
 				if (!tcp.tcp_do_output_nagle(pcb) &&
-				  ((pcb.flags & (tcp_pcb.TF_NAGLEMEMERR | tcp_pcb.TF_FIN)) == 0))
-				{
+				  ((pcb.flags & (tcp_pcb.TF_NAGLEMEMERR | tcp_pcb.TF_FIN)) == 0)) {
 					break;
 				}
 #if TCP_CWND_DEBUG
@@ -1062,48 +994,40 @@ namespace uITron3
 
 				pcb.unsent = seg.next;
 
-				if (pcb.state != tcp_state.SYN_SENT)
-				{
+				if (pcb.state != tcp_state.SYN_SENT) {
 					tcp_hdr.TCPH_SET_FLAG(seg.tcphdr, tcp.TCP_ACK);
 					pcb.flags &= unchecked((byte)~(tcp_pcb.TF_ACK_DELAY | tcp_pcb.TF_ACK_NOW));
 				}
 
 				tcp_output_segment(seg, pcb);
 				snd_nxt = lwip.lwip_ntohl(seg.tcphdr.seqno) + (uint)tcp_hdr.TCP_TCPLEN(seg);
-				if (tcp.TCP_SEQ_LT(pcb.snd_nxt, snd_nxt))
-				{
+				if (tcp.TCP_SEQ_LT(pcb.snd_nxt, snd_nxt)) {
 					pcb.snd_nxt = snd_nxt;
 				}
 				/* put segment on unacknowledged list if length > 0 */
-				if (tcp_hdr.TCP_TCPLEN(seg) > 0)
-				{
+				if (tcp_hdr.TCP_TCPLEN(seg) > 0) {
 					seg.next = null;
 					/* unacked list is empty? */
-					if (pcb.unacked == null)
-					{
+					if (pcb.unacked == null) {
 						pcb.unacked = seg;
 						useg = seg;
 						/* unacked list is not empty? */
 					}
-					else
-					{
+					else {
 						/* In the case of fast retransmit, the packet should not go to the tail
 						 * of the unacked queue, but rather somewhere before it. We need to check for
 						 * this case. -STJ Jul 27, 2004 */
-						if (tcp.TCP_SEQ_LT(lwip.lwip_ntohl(seg.tcphdr.seqno), lwip.lwip_ntohl(useg.tcphdr.seqno)))
-						{
+						if (tcp.TCP_SEQ_LT(lwip.lwip_ntohl(seg.tcphdr.seqno), lwip.lwip_ntohl(useg.tcphdr.seqno))) {
 							/* add segment to before tail of unacked list, keeping the list sorted */
 							tcp_seg cur_seg = pcb.unacked;
 							while (cur_seg != null &&
-							  tcp.TCP_SEQ_LT(lwip.lwip_ntohl((cur_seg).tcphdr.seqno), lwip.lwip_ntohl(seg.tcphdr.seqno)))
-							{
+							  tcp.TCP_SEQ_LT(lwip.lwip_ntohl((cur_seg).tcphdr.seqno), lwip.lwip_ntohl(seg.tcphdr.seqno))) {
 								cur_seg = cur_seg.next;
 							}
 							seg.next = (cur_seg);
 							(cur_seg) = seg;
 						}
-						else
-						{
+						else {
 							/* add segment to tail of unacked list */
 							useg.next = seg;
 							useg = useg.next;
@@ -1111,15 +1035,13 @@ namespace uITron3
 					}
 					/* do not queue empty segments on the unacked list */
 				}
-				else
-				{
+				else {
 					tcp_seg_free(seg);
 				}
 				seg = pcb.unsent;
 			}
 #if TCP_OVERSIZE
-			if (pcb.unsent == null)
-			{
+			if (pcb.unsent == null) {
 				/* last unsent has been removed, reset unsent_oversize */
 				pcb.unsent_oversize = 0;
 			}
@@ -1155,8 +1077,7 @@ namespace uITron3
 			/* Add any requested options.  NB MSS option is only set on SYN
 			   packets, so ignore it here */
 			opts = new pointer(seg.tcphdr.data, seg.tcphdr.offset + tcp_hdr.length);
-			if ((seg.flags & tcp_seg.TF_SEG_OPTS_MSS) != 0)
-			{
+			if ((seg.flags & tcp_seg.TF_SEG_OPTS_MSS) != 0) {
 				ushort mss;
 #if TCP_CALCULATE_EFF_SEND_MSS
 				mss = tcp_eff_send_mss(opt.TCP_MSS, pcb.remote_ip);
@@ -1169,8 +1090,7 @@ namespace uITron3
 #if LWIP_TCP_TIMESTAMPS
 			pcb.ts_lastacksent = pcb.rcv_nxt;
 
-			if ((seg.flags & tcp_seg.TF_SEG_OPTS_TS) != 0)
-			{
+			if ((seg.flags & tcp_seg.TF_SEG_OPTS_TS) != 0) {
 				tcp_build_timestamp_option(pcb, /*opts*/new pointer(seg.tcphdr.data, seg.tcphdr.offset + 1));
 				opts += 3;
 			}
@@ -1178,20 +1098,17 @@ namespace uITron3
 
 			/* Set retransmission timer running if it is not currently enabled 
 			   This must be set before checking the route. */
-			if (pcb.rtime == -1)
-			{
+			if (pcb.rtime == -1) {
 				pcb.rtime = 0;
 			}
 
 			/* If we don't have a local IP address, we get one by
 			   calling ip.ip_route(). */
-			if (ip_addr.ip_addr_isany(pcb.local_ip))
-			{
+			if (ip_addr.ip_addr_isany(pcb.local_ip)) {
 				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip_addr);
 			}
 
-			if (pcb.rttest == 0)
-			{
+			if (pcb.rttest == 0) {
 				pcb.rttest = tcp_ticks;
 				pcb.rtseq = lwip.lwip_ntohl(seg.tcphdr.seqno);
 
@@ -1217,8 +1134,7 @@ namespace uITron3
 				ushort chksum_slow = lwip.inet_chksum_pseudo(seg.p, pcb.local_ip,
 					   pcb.remote_ip, lwip.IP_PROTO_TCP, seg.p.tot_len);
 #endif // TCP_CHECKSUM_ON_COPY_SANITY_CHECK
-				if ((seg.flags & tcp_seg.TF_SEG_DATA_CHECKSUMMED) == 0)
-				{
+				if ((seg.flags & tcp_seg.TF_SEG_DATA_CHECKSUMMED) == 0) {
 					lwip.LWIP_ASSERT("data included but not checksummed",
 					  seg.p.tot_len == (tcp_hdr.TCPH_HDRLEN(seg.tcphdr) * 4));
 				}
@@ -1228,16 +1144,14 @@ namespace uITron3
 						 pcb.remote_ip,
 						 lwip.IP_PROTO_TCP, seg.p.tot_len, (ushort)(tcp_hdr.TCPH_HDRLEN(seg.tcphdr) * 4));
 				/* add payload checksum */
-				if (seg.chksum_swapped)
-				{
+				if (seg.chksum_swapped) {
 					seg.chksum = lwip.SWAP_BYTES_IN_WORD(seg.chksum);
 					seg.chksum_swapped = false;
 				}
 				acc += (ushort)~(seg.chksum);
 				seg.tcphdr.chksum = (ushort)lwip.FOLD_U32T(acc);
 #if TCP_CHECKSUM_ON_COPY_SANITY_CHECK
-				if (chksum_slow != seg.tcphdr.chksum)
-				{
+				if (chksum_slow != seg.tcphdr.chksum) {
 					lwip.LWIP_DEBUGF(opt.TCP_DEBUG | lwip.LWIP_DBG_LEVEL_WARNING,
 								"tcp_output_segment: calculated checksum is {0} instead of {1:X}\n",
 								seg.tcphdr.chksum, chksum_slow);
@@ -1289,8 +1203,7 @@ namespace uITron3
 			pbuf p;
 			tcp_hdr tcphdr;
 			p = lwip.pbuf_alloc(pbuf_layer.PBUF_IP, tcp.TCP_HLEN, pbuf_type.PBUF_RAM);
-			if (p == null)
-			{
+			if (p == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_rst: could not allocate memory for pbuf\n");
 				return;
 			}
@@ -1330,8 +1243,7 @@ namespace uITron3
 		{
 			tcp_seg seg;
 
-			if (pcb.unacked == null)
-			{
+			if (pcb.unacked == null) {
 				return;
 			}
 
@@ -1367,8 +1279,7 @@ namespace uITron3
 			tcp_seg seg;
 			tcp_seg cur_seg;
 
-			if (pcb.unacked == null)
-			{
+			if (pcb.unacked == null) {
 				return;
 			}
 
@@ -1379,15 +1290,13 @@ namespace uITron3
 
 			cur_seg = pcb.unsent;
 			while (cur_seg != null &&
-			  tcp.TCP_SEQ_LT(lwip.lwip_ntohl((cur_seg).tcphdr.seqno), lwip.lwip_ntohl(seg.tcphdr.seqno)))
-			{
+			  tcp.TCP_SEQ_LT(lwip.lwip_ntohl((cur_seg).tcphdr.seqno), lwip.lwip_ntohl(seg.tcphdr.seqno))) {
 				cur_seg = cur_seg.next;
 			}
 			seg.next = cur_seg;
 			cur_seg = seg;
 #if TCP_OVERSIZE
-			if (seg.next == null)
-			{
+			if (seg.next == null) {
 				/* the retransmitted segment is last in unsent, so reset unsent_oversize */
 				pcb.unsent_oversize = 0;
 			}
@@ -1412,8 +1321,7 @@ namespace uITron3
 		 */
 		public static void tcp_rexmit_fast(tcp_pcb pcb)
 		{
-			if (pcb.unacked != null && (pcb.flags & tcp_pcb.TF_INFR) == 0)
-			{
+			if (pcb.unacked != null && (pcb.flags & tcp_pcb.TF_INFR) == 0) {
 				/* This is fast retransmit. Retransmit the first unacked segment. */
 				lwip.LWIP_DEBUGF(opt.TCP_FR_DEBUG,
 							"tcp_receive: dupacks {0} ({1}"
@@ -1424,18 +1332,15 @@ namespace uITron3
 
 				/* Set ssthresh to half of the minimum of the current
 				 * cwnd and the advertised window */
-				if (pcb.cwnd > pcb.snd_wnd)
-				{
+				if (pcb.cwnd > pcb.snd_wnd) {
 					pcb.ssthresh = (ushort)(pcb.snd_wnd / 2);
 				}
-				else
-				{
+				else {
 					pcb.ssthresh = (ushort)(pcb.cwnd / 2);
 				}
 
 				/* The minimum value for ssthresh should be 2 MSS */
-				if (pcb.ssthresh < 2 * pcb.mss)
-				{
+				if (pcb.ssthresh < 2 * pcb.mss) {
 					lwip.LWIP_DEBUGF(opt.TCP_FR_DEBUG,
 								"tcp_receive: The minimum value for ssthresh {0}"
 								 + " should be min 2 mss {1}...\n",
@@ -1470,8 +1375,7 @@ namespace uITron3
 									tcp_ticks, pcb.tmr, pcb.keep_cnt_sent);
 
 			p = tcp_output_alloc_header(pcb, 0, 0, lwip.lwip_htonl(pcb.snd_nxt - 1));
-			if (p == null)
-			{
+			if (p == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG,
 							("tcp_keepalive: could not allocate memory for pbuf\n"));
 				return;
@@ -1528,12 +1432,10 @@ namespace uITron3
 
 			seg = pcb.unacked;
 
-			if (seg == null)
-			{
+			if (seg == null) {
 				seg = pcb.unsent;
 			}
-			if (seg == null)
-			{
+			if (seg == null) {
 				return;
 			}
 
@@ -1542,20 +1444,17 @@ namespace uITron3
 			len = is_fin != 0 ? (ushort)0 : (ushort)1;
 
 			p = tcp_output_alloc_header(pcb, 0, len, seg.tcphdr.seqno);
-			if (p == null)
-			{
+			if (p == null) {
 				lwip.LWIP_DEBUGF(opt.TCP_DEBUG, "tcp_zero_window_probe: no memory for pbuf\n");
 				return;
 			}
 			tcphdr = new tcp_hdr(p.payload);
 
-			if (is_fin != 0)
-			{
+			if (is_fin != 0) {
 				/* FIN segment, no data */
 				tcp_hdr.TCPH_FLAGS_SET(tcphdr, tcp.TCP_ACK | tcp.TCP_FIN);
 			}
-			else
-			{
+			else {
 				/* Data segment, copy in one byte from the head of the unacked queue */
 				pointer d = p.payload + tcp.TCP_HLEN;
 				/* Depending on whether the segment has already been sent (unacked) or not

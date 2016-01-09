@@ -69,7 +69,7 @@ namespace uITron3
 			Value = value;
 		}
 
-		public static implicit operator int (ID a)
+		public static implicit operator int(ID a)
 		{
 			return a.Value;
 		}
@@ -118,7 +118,7 @@ namespace uITron3
 			Value = value;
 		}
 
-		public static implicit operator int (ATR a)
+		public static implicit operator int(ATR a)
 		{
 			return a.Value;
 		}
@@ -145,7 +145,7 @@ namespace uITron3
 			Value = value;
 		}
 
-		public static implicit operator long (TMO a)
+		public static implicit operator long(TMO a)
 		{
 			return a.Value;
 		}
@@ -165,7 +165,7 @@ namespace uITron3
 			Value = value;
 		}
 
-		public static implicit operator int (HNO a)
+		public static implicit operator int(HNO a)
 		{
 			return a.Value;
 		}
@@ -187,7 +187,7 @@ namespace uITron3
 			Value = value;
 		}
 
-		public static implicit operator int (PRI a)
+		public static implicit operator int(PRI a)
 		{
 			return a.Value;
 		}
@@ -1867,6 +1867,93 @@ namespace uITron3
 			return Result;
 		}
 
+		public ER udp6_cre_cep(ID cepid, ref T_UDP6_CCEP pk_ccep, out ID p_cepid)
+		{
+			ER Result = ER.E_NOEXS;
+
+			p_cepid = ID.NULL;
+
+			if (g_Kernel == null)
+				return ER.E_DLT;
+
+			g_Kernel.LockCPU();
+			try {
+				Result = g_Kernel.Nucleus.CreateUdp6Cep(cepid, ref pk_ccep, out p_cepid);
+			}
+			finally {
+				g_Kernel.UnlockCPU();
+			}
+
+			return Result;
+		}
+
+		public ER udp6_del_cep(ID cepid)
+		{
+			ER Result = ER.E_NOEXS;
+
+			if (g_Kernel == null)
+				return ER.E_DLT;
+
+			g_Kernel.LockCPU();
+			try {
+				Result = g_Kernel.Nucleus.DeleteUdp6Cep(cepid);
+			}
+			finally {
+				g_Kernel.UnlockCPU();
+			}
+
+			return Result;
+		}
+
+		public ER udp6_snd_dat(ID cepid, T_IPV6EP p_dstaddr, pointer data, ushort len, TMO tmout)
+		{
+			ER Result = ER.E_NOEXS;
+			Udp6Cep UdpCep;
+
+			if ((data == null) || (len <= 0))
+				return ER.E_PAR;
+
+			if (g_Kernel == null)
+				return ER.E_DLT;
+
+			g_Kernel.LockCPU();
+			try {
+				UdpCep = g_Kernel.Nucleus.GetUdp6Cep(cepid);
+				if (UdpCep == null)
+					Result = ER.E_NOEXS;
+				else
+					Result = UdpCep.SendData(p_dstaddr, data, len, tmout);
+			}
+			finally {
+				g_Kernel.UnlockCPU();
+			}
+
+			return Result;
+		}
+
+		public ER udp6_rcv_dat(ID cepid, T_IPV6EP p_dstaddr, pointer data, int len, TMO tmout)
+		{
+			ER Result = ER.E_NOEXS;
+			Udp6Cep UdpCep;
+
+			if (g_Kernel == null)
+				return ER.E_DLT;
+
+			g_Kernel.LockCPU();
+			try {
+				UdpCep = g_Kernel.Nucleus.GetUdp6Cep(cepid);
+				if (UdpCep == null)
+					Result = ER.E_NOEXS;
+				else
+					Result = UdpCep.ReceiveData(p_dstaddr, data, len, tmout);
+			}
+			finally {
+				g_Kernel.UnlockCPU();
+			}
+
+			return Result;
+		}
+
 		public ER tcp_cre_rep(ID repid, ref T_TCP_CREP pk_crep, out ID p_repid)
 		{
 			ER Result = ER.E_NOEXS;
@@ -1991,7 +2078,7 @@ namespace uITron3
 				TcpCep = g_Kernel.Nucleus.GetTcpCep(cepid);
 				if (TcpCep == null)
 					Result = ER.E_NOEXS;
-				else 
+				else
 					Result = TcpCep.Connect(p_myaddr, p_dstaddr, tmout);
 			}
 			finally {
@@ -2086,6 +2173,8 @@ namespace uITron3
 				TcpCep = g_Kernel.Nucleus.GetTcpCep(cepid);
 				if (TcpCep == null)
 					Result = ER.E_NOEXS;
+				else if (tmout == TMO.TMO_NBLK)
+					Result = TcpCep.ReceiveDataNblk(data, len);
 				else
 					Result = TcpCep.ReceiveData(data, len, tmout);
 			}
@@ -2301,6 +2390,52 @@ namespace uITron3
 			}
 
 			return Result;
+		}
+
+		public static byte[] GetIp4Packet(pointer packet, int len, ip_addr src, ip_addr dst, byte proto)
+		{
+			byte[] data = new byte[2 + 2 * ip_addr.length + len];
+
+			data[0] = 4;
+			data[1] = proto;
+			pointer.memcpy(new pointer(data, 2), src, ip_addr.length);
+			pointer.memcpy(new pointer(data, 2 + ip_addr.length), dst, ip_addr.length);
+			pointer.memcpy(new pointer(data, 2 + 2 * ip_addr.length), packet, len);
+
+			return data;
+		}
+
+		public static pointer CastIp4Packet(byte[] packet, out int len, out ip_addr src, out ip_addr dst, out byte proto)
+		{
+			len = packet.Length - (2 + 2 * ip_addr.length);
+			proto = packet[1];
+			src = new ip_addr(packet, 2);
+			dst = new ip_addr(packet, 2 + ip_addr.length);
+
+			return new pointer(packet, 2 + 2 * ip_addr.length);
+		}
+
+		public static byte[] GetIp6Packet(pointer packet, int len, ip6_addr src, ip6_addr dst, byte proto)
+		{
+			byte[] data = new byte[2 + 2 * ip6_addr.length + len];
+
+			data[0] = 6;
+			data[1] = proto;
+			pointer.memcpy(new pointer(data, 2), src, ip6_addr.length);
+			pointer.memcpy(new pointer(data, 2 + ip6_addr.length), dst, ip6_addr.length);
+			pointer.memcpy(new pointer(data, 2 + 2 * ip6_addr.length), packet, len);
+
+			return data;
+		}
+
+		public static pointer CastIp6Packet(byte[] packet, out int len, out ip6_addr src, out ip6_addr dst, out byte proto)
+		{
+			len = packet.Length - (2 + 2 * ip6_addr.length);
+			proto = packet[1];
+			src = new ip6_addr(packet, 2);
+			dst = new ip6_addr(packet, 2 + ip6_addr.length);
+
+			return new pointer(packet, 2 + 2 * ip6_addr.length);
 		}
 	}
 }

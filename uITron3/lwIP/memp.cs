@@ -100,14 +100,13 @@ namespace uITron3
 	{
 		internal pointer memp_malloc(mempb_t type)
 		{
-			switch (type)
-			{
-				case mempb_t.MEMP_PBUF:
-					return new pointer(new byte[pbuf.length], 0);
-				case mempb_t.MEMP_PBUF_POOL:
-					return new pointer(new byte[opt.PBUF_POOL_BUFSIZE], 0);
-				default:
-					throw new InvalidOperationException();
+			switch (type) {
+			case mempb_t.MEMP_PBUF:
+				return new pointer(new byte[pbuf.length], 0);
+			case mempb_t.MEMP_PBUF_POOL:
+				return new pointer(new byte[opt.PBUF_POOL_BUFSIZE], 0);
+			default:
+				throw new InvalidOperationException();
 			}
 		}
 
@@ -120,28 +119,27 @@ namespace uITron3
 		{
 			memp memp;
 
-			switch (type)
-			{
+			switch (type) {
 #if LWIP_RAW
 				case memp_t.MEMP_RAW_PCB:
 					memp = new raw_pcb(this);
 					break;
 #endif
 #if LWIP_UDP
-				case memp_t.MEMP_UDP_PCB:
-					memp = new udp_pcb(this);
-					break;
+			case memp_t.MEMP_UDP_PCB:
+				memp = new udp_pcb(this);
+				break;
 #endif
 #if LWIP_TCP
-				case memp_t.MEMP_TCP_PCB:
-					memp = new tcp_pcb(this);
-					break;
-				case memp_t.MEMP_TCP_PCB_LISTEN:
-					memp = new tcp_pcb_listen(this);
-					break;
-				case memp_t.MEMP_TCP_SEG:
-					memp = new tcp_seg(this);
-					break;
+			case memp_t.MEMP_TCP_PCB:
+				memp = new tcp_pcb(this);
+				break;
+			case memp_t.MEMP_TCP_PCB_LISTEN:
+				memp = new tcp_pcb_listen(this);
+				break;
+			case memp_t.MEMP_TCP_SEG:
+				memp = new tcp_seg(this);
+				break;
 #endif
 #if IP_REASSEMBLY
 			case memp_t.MEMP_REASSDATA:
@@ -159,7 +157,7 @@ namespace uITron3
 				memp = new netconn(this);
 				break;
 #endif
-#if !NO_SYS
+#if false //!NO_SYS
 			case memp_t.MEMP_TCPIP_MSG_API:
 				memp = new tcpip_msg(this);
 				break;
@@ -177,10 +175,10 @@ namespace uITron3
 				memp = new igmp_group(this);
 				break;
 #endif
-#if (!NO_SYS || (NO_SYS && !NO_SYS_NO_TIMERS))
-				case memp_t.MEMP_SYS_TIMEOUT:
-					memp = new sys_timeo(this);
-					break;
+#if false //(!NO_SYS || (NO_SYS && !NO_SYS_NO_TIMERS))
+			case memp_t.MEMP_SYS_TIMEOUT:
+				memp = new sys_timeo(this);
+				break;
 #endif
 #if LWIP_SNMP
 			case memp_t.MEMP_SNMP_ROOTNODE:
@@ -211,8 +209,8 @@ namespace uITron3
 				memp = new pppoe_softc(this);
 				break;
 #endif
-				default:
-					throw new InvalidOperationException();
+			default:
+				throw new InvalidOperationException();
 			}
 
 			memp._type = type;

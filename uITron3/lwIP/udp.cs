@@ -203,17 +203,13 @@ namespace uITron3
 			udp_pcb pcb;
 
 		again:
-			if (udp_port++ == UDP_LOCAL_PORT_RANGE_END)
-			{
+			if (udp_port++ == UDP_LOCAL_PORT_RANGE_END) {
 				udp_port = UDP_LOCAL_PORT_RANGE_START;
 			}
 			/* Check all PCBs. */
-			for (pcb = udp_pcbs; pcb != null; pcb = pcb.next)
-			{
-				if (pcb.local_port == udp_port)
-				{
-					if (++n > (UDP_LOCAL_PORT_RANGE_END - UDP_LOCAL_PORT_RANGE_START))
-					{
+			for (pcb = udp_pcbs; pcb != null; pcb = pcb.next) {
+				if (pcb.local_port == udp_port) {
+					if (++n > (UDP_LOCAL_PORT_RANGE_END - UDP_LOCAL_PORT_RANGE_START)) {
 						return 0;
 					}
 					goto again;
@@ -257,12 +253,11 @@ namespace uITron3
 		 * @param inp network interface on which the datagram was received.
 		 *
 		 */
-		public void udp_input(pbuf p, lwip inp)
+		public void udp_input(pbuf p, lwip inp, bool lite)
 		{
 			udp_hdr udphdr;
 			udp_pcb pcb, prev;
 			udp_pcb uncon_pcb;
-			ip_hdr iphdr;
 			ushort src, dest;
 			byte local_match;
 			bool broadcast;
@@ -271,12 +266,9 @@ namespace uITron3
 
 			++lwip.lwip_stats.udp.recv;
 
-			iphdr = new ip_hdr(p.payload);
-
 			/* Check minimum length (IP header + UDP header)
 			 * and move payload pointer to UDP header */
-			if (p.tot_len < (ip_hdr.IPH_HL(iphdr) * 4 + UDP_HLEN) || lwip.pbuf_header(p, (short)-(ip_hdr.IPH_HL(iphdr) * 4)) != 0)
-			{
+			if (p.tot_len < UDP_HLEN) {
 				/* drop short packets */
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG,
 							"udp_input: short UDP datagram ({0} bytes) discarded\n", p.tot_len);
@@ -304,10 +296,10 @@ namespace uITron3
 			lwip.LWIP_DEBUGF(opt.UDP_DEBUG,
 						"udp ({0}.{1}.{2}.{3}, {4}) <-- "
 						 + "({5}.{6}.{7}.{8}, {9})\n",
-						 ip_addr.ip4_addr1_16(iphdr.dest), ip_addr.ip4_addr2_16(iphdr.dest),
-						 ip_addr.ip4_addr3_16(iphdr.dest), ip_addr.ip4_addr4_16(iphdr.dest), lwip.lwip_ntohs(udphdr.dest),
-						 ip_addr.ip4_addr1_16(iphdr.src), ip_addr.ip4_addr2_16(iphdr.src),
-						 ip_addr.ip4_addr3_16(iphdr.src), ip_addr.ip4_addr4_16(iphdr.src), lwip.lwip_ntohs(udphdr.src));
+						 ip_addr.ip4_addr1_16(lwip.current_iphdr_dest), ip_addr.ip4_addr2_16(lwip.current_iphdr_dest),
+						 ip_addr.ip4_addr3_16(lwip.current_iphdr_dest), ip_addr.ip4_addr4_16(lwip.current_iphdr_dest), lwip.lwip_ntohs(udphdr.dest),
+						 ip_addr.ip4_addr1_16(lwip.current_iphdr_src), ip_addr.ip4_addr2_16(lwip.current_iphdr_src),
+						 ip_addr.ip4_addr3_16(lwip.current_iphdr_src), ip_addr.ip4_addr4_16(lwip.current_iphdr_src), lwip.lwip_ntohs(udphdr.src));
 
 #if LWIP_DHCP
 			pcb = null;
@@ -341,8 +333,7 @@ namespace uITron3
 				 * 'Perfect match' pcbs (connected to the remote port & ip address) are
 				 * preferred. If no perfect match is found, the first unconnected pcb that
 				 * matches the local port and ip address gets the datagram. */
-				for (pcb = udp_pcbs; pcb != null; pcb = pcb.next)
-				{
+				for (pcb = udp_pcbs; pcb != null; pcb = pcb.next) {
 					local_match = 0;
 					/* print the PCB local and remote address */
 					lwip.LWIP_DEBUGF(opt.UDP_DEBUG,
@@ -354,8 +345,7 @@ namespace uITron3
 								 ip_addr.ip4_addr3_16(pcb.remote_ip), ip_addr.ip4_addr4_16(pcb.remote_ip), pcb.remote_port);
 
 					/* compare PCB local addr+port to UDP destination addr+port */
-					if (pcb.local_port == dest)
-					{
+					if (pcb.local_port == dest) {
 						if ((!broadcast && ip_addr.ip_addr_isany(pcb.local_ip)) ||
 							ip_addr.ip_addr_cmp(pcb.local_ip, lwip.current_iphdr_dest) ||
 #if LWIP_IGMP
@@ -373,8 +363,7 @@ namespace uITron3
 						{
 							local_match = 1;
 							if ((uncon_pcb == null) &&
-								((pcb.flags & UDP_FLAGS_CONNECTED) == 0))
-							{
+								((pcb.flags & UDP_FLAGS_CONNECTED) == 0)) {
 								/* the first unconnected matching PCB */
 								uncon_pcb = pcb;
 							}
@@ -384,19 +373,16 @@ namespace uITron3
 					if ((local_match != 0) &&
 						(pcb.remote_port == src) &&
 						(ip_addr.ip_addr_isany(pcb.remote_ip) ||
-						 ip_addr.ip_addr_cmp(pcb.remote_ip, lwip.current_iphdr_src)))
-					{
+						 ip_addr.ip_addr_cmp(pcb.remote_ip, lwip.current_iphdr_src))) {
 						/* the first fully matching PCB */
-						if (prev != null)
-						{
+						if (prev != null) {
 							/* move the pcb to the front of udp_pcbs so that is
 							   found faster next time */
 							prev.next = pcb.next;
 							pcb.next = udp_pcbs;
 							udp_pcbs = pcb;
 						}
-						else
-						{
+						else {
 							++lwip.lwip_stats.udp.cachehit;
 						}
 						break;
@@ -404,32 +390,26 @@ namespace uITron3
 					prev = pcb;
 				}
 				/* no fully matching pcb found? then look for an unconnected pcb */
-				if (pcb == null)
-				{
+				if (pcb == null) {
 					pcb = uncon_pcb;
 				}
 			}
 
 			/* Check checksum if this is a match or if it was directed at us. */
-			if (pcb != null || ip_addr.ip_addr_cmp(inp.ip_addr, lwip.current_iphdr_dest))
-			{
+			if (pcb != null || ip_addr.ip_addr_cmp(inp.ip_addr, lwip.current_iphdr_dest)) {
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE, "udp_input: calculating checksum\n");
 #if LWIP_UDPLITE
-				if (ip_hdr.IPH_PROTO(iphdr) == lwip.IP_PROTO_UDPLITE)
-				{
+				if (lite) {
 					/* Do the UDP Lite checksum */
 #if CHECKSUM_CHECK_UDP
 					ushort chklen = lwip.lwip_ntohs(udphdr.len);
-					if (chklen < udp_hdr.length)
-					{
-						if (chklen == 0)
-						{
+					if (chklen < udp_hdr.length) {
+						if (chklen == 0) {
 							/* For UDP-Lite, checksum length of 0 means checksum
 								over the complete packet (See RFC 3828 chap. 3.1) */
 							chklen = p.tot_len;
 						}
-						else
-						{
+						else {
 							/* At least the UDP-Lite header must be covered by the
 								checksum! (Again, see RFC 3828 chap. 3.1) */
 							++lwip.lwip_stats.udp.chkerr;
@@ -440,8 +420,7 @@ namespace uITron3
 						}
 					}
 					if (lwip.inet_chksum_pseudo_partial(p, lwip.current_iphdr_src, lwip.current_iphdr_dest,
-											 lwip.IP_PROTO_UDPLITE, p.tot_len, chklen) != 0)
-					{
+											 lwip.IP_PROTO_UDPLITE, p.tot_len, chklen) != 0) {
 						lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
 								("udp_input: UDP Lite datagram discarded due to failing checksum\n"));
 						++lwip.lwip_stats.udp.chkerr;
@@ -456,11 +435,9 @@ namespace uITron3
 #endif // LWIP_UDPLITE
 				{
 #if CHECKSUM_CHECK_UDP
-					if (udphdr.chksum != 0)
-					{
+					if (udphdr.chksum != 0) {
 						if (lwip.inet_chksum_pseudo(p, lwip.ip_current_src_addr(), lwip.ip_current_dest_addr(),
-								lwip.IP_PROTO_UDP, p.tot_len) != 0)
-						{
+								lwip.IP_PROTO_UDP, p.tot_len) != 0) {
 							lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
 										("udp_input: UDP datagram discarded due to failing checksum\n"));
 							++lwip.lwip_stats.udp.chkerr;
@@ -472,8 +449,7 @@ namespace uITron3
 					}
 #endif // CHECKSUM_CHECK_UDP
 				}
-				if (lwip.pbuf_header(p, -UDP_HLEN) != 0)
-				{
+				if (lwip.pbuf_header(p, -UDP_HLEN) != 0) {
 					/* Can we cope with this failing? Just assert for now */
 					lwip.LWIP_ASSERT("pbuf_header failed\n", false);
 					++lwip.lwip_stats.udp.drop;
@@ -481,21 +457,17 @@ namespace uITron3
 					lwip.pbuf_free(p);
 					goto end;
 				}
-				if (pcb != null)
-				{
+				if (pcb != null) {
 					//snmp.snmp_inc_udpindatagrams();
 #if SO_REUSE && SO_REUSE_RXTOALL
 					if ((broadcast || ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest)) &&
-						lwip.ip_get_option(pcb, sof.SOF_REUSEADDR))
-					{
+						lwip.ip_get_option(pcb, sof.SOF_REUSEADDR)) {
 						/* pass broadcast- or multicast packets to all multicast pcbs
 						   if sof.SOF_REUSEADDR is set on the first match */
 						udp_pcb mpcb;
 						byte p_header_changed = 0;
-						for (mpcb = udp_pcbs; mpcb != null; mpcb = mpcb.next)
-						{
-							if (mpcb != pcb)
-							{
+						for (mpcb = udp_pcbs; mpcb != null; mpcb = mpcb.next) {
+							if (mpcb != pcb) {
 								/* compare PCB local addr+port to UDP destination addr+port */
 								if ((mpcb.local_port == dest) &&
 									((!broadcast && ip_addr.ip_addr_isany(mpcb.local_ip)) ||
@@ -504,30 +476,25 @@ namespace uITron3
 										ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest) ||
 #endif // LWIP_IGMP
 #if IP_SOF_BROADCAST_RECV
-										(broadcast && lwip.ip_get_option(mpcb, sof.SOF_BROADCAST))))
-								{
+										(broadcast && lwip.ip_get_option(mpcb, sof.SOF_BROADCAST)))) {
 #else  // IP_SOF_BROADCAST_RECV
 										(broadcast)))
 								{
 #endif // IP_SOF_BROADCAST_RECV
 									/* pass a copy of the packet to all local matches */
-									if (mpcb.recv != null)
-									{
+									if (mpcb.recv != null) {
 										pbuf q;
 										/* for that, move payload to IP header again */
-										if (p_header_changed == 0)
-										{
-											lwip.pbuf_header(p, (short)((ip_hdr.IPH_HL(iphdr) * 4) + UDP_HLEN));
+										if (p_header_changed == 0) {
+											lwip.pbuf_header(p, UDP_HLEN);
 											p_header_changed = 1;
 										}
 										q = lwip.pbuf_alloc(pbuf_layer.PBUF_RAW, p.tot_len, pbuf_type.PBUF_RAM);
-										if (q != null)
-										{
+										if (q != null) {
 											err_t err = lwip.pbuf_copy(q, p);
-											if (err == err_t.ERR_OK)
-											{
+											if (err == err_t.ERR_OK) {
 												/* move payload to UDP data */
-												lwip.pbuf_header(q, (short)-((ip_hdr.IPH_HL(iphdr) * 4) + UDP_HLEN));
+												lwip.pbuf_header(q, -UDP_HLEN);
 												mpcb.recv(mpcb.recv_arg, mpcb, q, lwip.ip_current_src_addr(), src);
 											}
 										}
@@ -535,28 +502,24 @@ namespace uITron3
 								}
 							}
 						}
-						if (p_header_changed != 0)
-						{
+						if (p_header_changed != 0) {
 							/* and move payload to UDP data again */
-							lwip.pbuf_header(p, (short)-((ip_hdr.IPH_HL(iphdr) * 4) + UDP_HLEN));
+							lwip.pbuf_header(p, -UDP_HLEN);
 						}
 					}
 #endif // SO_REUSE && SO_REUSE_RXTOALL
 					/* callback */
-					if (pcb.recv != null)
-					{
+					if (pcb.recv != null) {
 						/* now the recv function is responsible for freeing p */
 						pcb.recv(pcb.recv_arg, pcb, p, lwip.ip_current_src_addr(), src);
 					}
-					else
-					{
+					else {
 						/* no recv function registered? then we have to free the pbuf! */
 						lwip.pbuf_free(p);
 						goto end;
 					}
 				}
-				else
-				{
+				else {
 					lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE, "udp_input: not for us.\n");
 
 #if LWIP_ICMP
@@ -566,7 +529,7 @@ namespace uITron3
 						!ip_addr.ip_addr_ismulticast(lwip.current_iphdr_dest))
 					{
 						/* move payload pointer back to ip header */
-						lwip.pbuf_header(p, (short)((ip_hdr.IPH_HL(iphdr) * 4) + UDP_HLEN));
+						lwip.pbuf_header(p, UDP_HLEN);
 						lwip.LWIP_ASSERT("p.payload == iphdr", (p.payload == iphdr));
 						lwip.icmp.icmp_dest_unreach(p, icmp_dur_type.ICMP_DUR_PORT);
 					}
@@ -577,8 +540,7 @@ namespace uITron3
 					lwip.pbuf_free(p);
 				}
 			}
-			else
-			{
+			else {
 				lwip.pbuf_free(p);
 			}
 		end:
@@ -695,8 +657,7 @@ namespace uITron3
 
 #if IP_SOF_BROADCAST
 			/* broadcast filter? */
-			if (!lwip.ip_get_option(pcb, sof.SOF_BROADCAST) && ip_addr.ip_addr_isbroadcast(dst_ip, netif))
-			{
+			if (!lwip.ip_get_option(pcb, sof.SOF_BROADCAST) && ip_addr.ip_addr_isbroadcast(dst_ip, netif)) {
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_LEVEL_SERIOUS,
 				  "udp_sendto_if: sof.SOF_BROADCAST not enabled on pcb {0}\n", pcb);
 				return err_t.ERR_VAL;
@@ -704,30 +665,25 @@ namespace uITron3
 #endif // IP_SOF_BROADCAST
 
 			/* if the PCB is not yet bound to a port, bind it here */
-			if (pcb.local_port == 0)
-			{
+			if (pcb.local_port == 0) {
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE, "udp_send: not yet bound to a port, binding now\n");
 				err = udp_bind(pcb, pcb.local_ip, pcb.local_port);
-				if (err != err_t.ERR_OK)
-				{
+				if (err != err_t.ERR_OK) {
 					lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE | lwip.LWIP_DBG_LEVEL_SERIOUS, "udp_send: forced port bind failed\n");
 					return err;
 				}
 			}
 
 			/* not enough space to add an UDP header to first pbuf in given p chain? */
-			if (lwip.pbuf_header(p, UDP_HLEN) != 0)
-			{
+			if (lwip.pbuf_header(p, UDP_HLEN) != 0) {
 				/* allocate header in a separate new pbuf */
 				q = lwip.pbuf_alloc(pbuf_layer.PBUF_IP, UDP_HLEN, pbuf_type.PBUF_RAM);
 				/* new header pbuf could not be allocated? */
-				if (q == null)
-				{
+				if (q == null) {
 					lwip.LWIP_DEBUGF(opt.UDP_DEBUG | lwip.LWIP_DBG_TRACE | lwip.LWIP_DBG_LEVEL_SERIOUS, "udp_send: could not allocate header\n");
 					return err_t.ERR_MEM;
 				}
-				if (p.tot_len != 0)
-				{
+				if (p.tot_len != 0) {
 					/* chain header q in front of given pbuf p (only if p contains data) */
 					lwip.pbuf_chain(q, p);
 				}
@@ -735,8 +691,7 @@ namespace uITron3
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG,
 							"udp_send: added header pbuf {0} before given pbuf {1}\n", q, p);
 			}
-			else
-			{
+			else {
 				/* adding space for header within p succeeded */
 				/* first pbuf q equals given pbuf */
 				q = p;
@@ -761,20 +716,16 @@ namespace uITron3
 
 
 			/* PCB local address is IP_ANY_ADDR? */
-			if (ip_addr.ip_addr_isany(pcb.local_ip))
-			{
+			if (ip_addr.ip_addr_isany(pcb.local_ip)) {
 				/* use outgoing network interface IP address as source address */
 				ip_addr.ip_addr_copy(src_ip, netif.ip_addr);
 			}
-			else
-			{
+			else {
 				/* check if UDP PCB local IP address is correct
 				 * this could be an old address if netif.ip_addr has changed */
-				if (!ip_addr.ip_addr_cmp(pcb.local_ip, netif.ip_addr))
-				{
+				if (!ip_addr.ip_addr_cmp(pcb.local_ip, netif.ip_addr)) {
 					/* local_ip doesn't match, drop the packet */
-					if (q != p)
-					{
+					if (q != p) {
 						/* free the header pbuf */
 						lwip.pbuf_free(q);
 						q = null;
@@ -790,16 +741,13 @@ namespace uITron3
 
 #if LWIP_UDPLITE
 			/* UDP Lite protocol? */
-			if ((pcb.flags & UDP_FLAGS_UDPLITE) != 0)
-			{
+			if ((pcb.flags & UDP_FLAGS_UDPLITE) != 0) {
 				ushort chklen, chklen_hdr;
 				lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_send: UDP LITE packet length {0}\n", q.tot_len);
 				/* set UDP message length in UDP header */
 				chklen_hdr = chklen = pcb.chksum_len_tx;
-				if ((chklen < udp_hdr.length) || (chklen > q.tot_len))
-				{
-					if (chklen != 0)
-					{
+				if ((chklen < udp_hdr.length) || (chklen > q.tot_len)) {
+					if (chklen != 0) {
 						lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_send: UDP LITE pcb.chksum_len is illegal: {0}\n", chklen);
 					}
 					/* For UDP-Lite, checksum length of 0 means checksum
@@ -820,8 +768,7 @@ namespace uITron3
 					chklen);
 #else // !LWIP_CHECKSUM_ON_COPY
 					((have_chksum != 0) ? (ushort)UDP_HLEN : chklen));
-				if (have_chksum != 0)
-				{
+				if (have_chksum != 0) {
 					uint acc;
 					acc = (uint)(udphdr.chksum + (ushort)~(chksum));
 					udphdr.chksum = (ushort)lwip.FOLD_U32T(acc);
@@ -829,8 +776,7 @@ namespace uITron3
 #endif // !LWIP_CHECKSUM_ON_COPY
 
 				/* chksum zero must become 0xffff, as zero means 'no checksum' */
-				if (udphdr.chksum == 0x0000)
-				{
+				if (udphdr.chksum == 0x0000) {
 					udphdr.chksum = 0xffff;
 				}
 #endif // CHECKSUM_GEN_UDP
@@ -845,12 +791,10 @@ namespace uITron3
 				udphdr.len = lwip.lwip_htons(q.tot_len);
 				/* calculate checksum */
 #if CHECKSUM_GEN_UDP
-				if ((pcb.flags & udp.UDP_FLAGS_NOCHKSUM) == 0)
-				{
+				if ((pcb.flags & udp.UDP_FLAGS_NOCHKSUM) == 0) {
 					ushort udpchksum;
 #if LWIP_CHECKSUM_ON_COPY
-					if (have_chksum != 0)
-					{
+					if (have_chksum != 0) {
 						uint acc;
 						udpchksum = lwip.inet_chksum_pseudo_partial(q, src_ip, dst_ip, lwip.IP_PROTO_UDP,
 						  q.tot_len, UDP_HLEN);
@@ -864,8 +808,7 @@ namespace uITron3
 					}
 
 					/* chksum zero must become 0xffff, as zero means 'no checksum' */
-					if (udpchksum == 0x0000)
-					{
+					if (udpchksum == 0x0000) {
 						udpchksum = 0xffff;
 					}
 					udphdr.chksum = udpchksum;
@@ -880,8 +823,7 @@ namespace uITron3
 			//snmp.snmp_inc_udpoutdatagrams();
 
 			/* did we chain a separate header pbuf earlier? */
-			if (q != p)
-			{
+			if (q != p) {
 				/* free the header pbuf */
 				lwip.pbuf_free(q);
 				q = null;
@@ -922,11 +864,9 @@ namespace uITron3
 
 			rebind = 0;
 			/* Check for double bind and rebind of the same pcb */
-			for (ipcb = udp_pcbs; ipcb != null; ipcb = ipcb.next)
-			{
+			for (ipcb = udp_pcbs; ipcb != null; ipcb = ipcb.next) {
 				/* is this UDP PCB already on active list? */
-				if (pcb == ipcb)
-				{
+				if (pcb == ipcb) {
 					/* pcb may occur at most once in active list */
 					lwip.LWIP_ASSERT("rebind == 0", rebind == 0);
 					/* pcb already in list, just rebind */
@@ -938,8 +878,7 @@ namespace uITron3
 				   REUSEADDR flag set. */
 #if SO_REUSE
 				else if (!lwip.ip_get_option(pcb, (byte)sof.SOF_REUSEADDR) &&
-						 !lwip.ip_get_option(ipcb, (byte)sof.SOF_REUSEADDR))
-				{
+						 !lwip.ip_get_option(ipcb, (byte)sof.SOF_REUSEADDR)) {
 #else // SO_REUSE
 				/* port matches that of PCB in list and REUSEADDR not set . reject */
 				else
@@ -949,8 +888,7 @@ namespace uITron3
 						/* IP address matches, or one is IP_ADDR_ANY? */
 						(ip_addr.ip_addr_isany(ipcb.local_ip) ||
 						 ip_addr.ip_addr_isany(ipaddr) ||
-						 ip_addr.ip_addr_cmp(ipcb.local_ip, ipaddr)))
-					{
+						 ip_addr.ip_addr_cmp(ipcb.local_ip, ipaddr))) {
 						/* other PCB already binds to this local IP and port */
 						lwip.LWIP_DEBUGF(opt.UDP_DEBUG,
 									"udp_bind: local port {0} already bound by another pcb\n", port);
@@ -962,11 +900,9 @@ namespace uITron3
 			ip_addr.ip_addr_set(pcb.local_ip, ipaddr);
 
 			/* no port specified? */
-			if (port == 0)
-			{
+			if (port == 0) {
 				port = udp_new_port();
-				if (port == 0)
-				{
+				if (port == 0) {
 					/* no more ports available in local range */
 					lwip.LWIP_DEBUGF(opt.UDP_DEBUG, "udp_bind: out of free UDP ports\n");
 					return err_t.ERR_USE;
@@ -975,8 +911,7 @@ namespace uITron3
 			pcb.local_port = port;
 			//snmp.snmp_insert_udpidx_tree(pcb);
 			/* pcb not active yet? */
-			if (rebind == 0)
-			{
+			if (rebind == 0) {
 				/* place the PCB on the active list if not already there */
 				pcb.next = udp_pcbs;
 				udp_pcbs = pcb;
@@ -1010,11 +945,9 @@ namespace uITron3
 		{
 			udp_pcb ipcb;
 
-			if (pcb.local_port == 0)
-			{
+			if (pcb.local_port == 0) {
 				err_t err = udp_bind(pcb, pcb.local_ip, pcb.local_port);
-				if (err != err_t.ERR_OK)
-				{
+				if (err != err_t.ERR_OK) {
 					return err;
 				}
 			}
@@ -1025,15 +958,13 @@ namespace uITron3
 			/** TODO: this functionality belongs in upper layers */
 #if LWIP_UDP_TODO
 			/* Nail down local IP for netconn_addr()/getsockname() */
-			if (ip_addr.ip_addr_isany(pcb.local_ip) && !ip_addr.ip_addr_isany(pcb.remote_ip))
-			{
+			if (ip_addr.ip_addr_isany(pcb.local_ip) && !ip_addr.ip_addr_isany(pcb.remote_ip)) {
 				/** TODO: this will bind the udp pcb locally, to the interface which
 					is used to route output packets to the remote address. However, we
 					might want to accept incoming packets on any interface! */
 				ip_addr.ip_addr_copy(pcb.local_ip, lwip.ip_addr);
 			}
-			else if (ip_addr.ip_addr_isany(pcb.remote_ip))
-			{
+			else if (ip_addr.ip_addr_isany(pcb.remote_ip)) {
 				ip_addr.ip_addr_copy(pcb.local_ip, new ip_addr(0));
 			}
 #endif
@@ -1044,10 +975,8 @@ namespace uITron3
 						 pcb.local_port);
 
 			/* Insert UDP PCB into the list of active UDP PCBs. */
-			for (ipcb = udp_pcbs; ipcb != null; ipcb = ipcb.next)
-			{
-				if (pcb == ipcb)
-				{
+			for (ipcb = udp_pcbs; ipcb != null; ipcb = ipcb.next) {
+				if (pcb == ipcb) {
 					/* already on the list, just return */
 					return err_t.ERR_OK;
 				}
@@ -1102,19 +1031,15 @@ namespace uITron3
 
 			//snmp.snmp_delete_udpidx_tree(pcb);
 			/* pcb to be removed is first in list? */
-			if (udp_pcbs == pcb)
-			{
+			if (udp_pcbs == pcb) {
 				/* make list start at 2nd pcb */
 				udp_pcbs = udp_pcbs.next;
 				/* pcb not 1st in list */
 			}
-			else
-			{
-				for (pcb2 = udp_pcbs; pcb2 != null; pcb2 = pcb2.next)
-				{
+			else {
+				for (pcb2 = udp_pcbs; pcb2 != null; pcb2 = pcb2.next) {
 					/* find pcb in udp_pcbs list */
-					if (pcb2.next != null && pcb2.next == pcb)
-					{
+					if (pcb2.next != null && pcb2.next == pcb) {
 						/* remove pcb from list */
 						pcb2.next = pcb.next;
 					}
@@ -1136,8 +1061,7 @@ namespace uITron3
 			udp_pcb pcb;
 			pcb = (udp_pcb)lwip.memp_malloc(memp_t.MEMP_UDP_PCB);
 			/* could allocate UDP PCB? */
-			if (pcb != null)
-			{
+			if (pcb != null) {
 				/* UDP Lite: by initializing to all zeroes, chksum_len is set to 0
 				 * which means checksum is generated over the whole datagram per default
 				 * (recommended as default by RFC 3828). */
